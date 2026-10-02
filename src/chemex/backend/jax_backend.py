@@ -189,7 +189,9 @@ class JaxBackend:
         function: Callable[..., object],
         args: Sequence[object],
     ) -> object:
-        return function(*args)
+        from chemex.backend import jax_scientific
+
+        return jax_scientific.evaluate(function_id, function, args)
 
     def __repr__(self) -> str:
         return "JaxBackend()"
