@@ -1,3 +1,6 @@
+# Modified in the ChemEx-JAX fork (GPL-3.0-or-later): profile stacking and
+# matrix powers go through the spectrometer backend.
+
 from __future__ import annotations
 
 from typing import Literal
@@ -98,7 +101,7 @@ class RelaxationHzNzSequence:
         delays = spectrometer.delays(0.25 * np.array(times))
         p180_i = spectrometer.perfect180_i[0]
         p180_s = spectrometer.perfect180_s[0]
-        return np.array(
+        return spectrometer.backend.stack(
             [
                 spectrometer.detect(
                     delay @ p180_s @ delay @ p180_i @ delay @ p180_s @ delay @ start,

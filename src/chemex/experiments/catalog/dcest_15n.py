@@ -1,9 +1,11 @@
+# Modified in the ChemEx-JAX fork (GPL-3.0-or-later): profile stacking and
+# matrix powers go through the spectrometer backend.
+
 from __future__ import annotations
 
 from typing import Literal, Self
 
 import numpy as np
-from numpy.linalg import matrix_power
 from pydantic import Field, computed_field, model_validator
 
 from chemex.configuration.base import ExperimentConfiguration, ToBeFitted
@@ -190,10 +192,14 @@ class DCest15NSequence:
             p_pulse = spectrometer.pulse_i(self.settings.pw_dante, 0.0)
 
             intensities[offset] = (
-                d_eq @ matrix_power(p_delay @ p_pulse, self.settings.ncyc_dante) @ start
+                d_eq
+                @ spectrometer.backend.matrix_power(
+                    p_delay @ p_pulse, self.settings.ncyc_dante
+                )
+                @ start
             )
 
-        return np.array(
+        return spectrometer.backend.stack(
             [spectrometer.detect(intensities[offset]) for offset in offsets],
         )
 

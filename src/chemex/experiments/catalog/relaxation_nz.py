@@ -1,3 +1,6 @@
+# Modified in the ChemEx-JAX fork (GPL-3.0-or-later): profile stacking and
+# matrix powers go through the spectrometer backend.
+
 from __future__ import annotations
 
 from typing import Literal
@@ -96,7 +99,9 @@ class RelaxationNzSequence:
 
         # Return profile
         delays = spectrometer.delays(times)
-        return np.array([spectrometer.detect(delay @ start) for delay in delays])
+        return spectrometer.backend.stack(
+            [spectrometer.detect(delay @ start) for delay in delays]
+        )
 
     def is_reference(self, metadata: Array) -> Array:
         return np.full_like(metadata, fill_value=False, dtype=np.bool_)
