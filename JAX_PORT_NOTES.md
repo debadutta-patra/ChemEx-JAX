@@ -457,7 +457,7 @@ The test therefore keeps the brief's criterion and, only where NumPy FD
 misses 1e-5 for a parameter with effect ≥ 1e-6, falls back to the exact
 reference with the *stricter* tolerance 1e-9 (on the 8 most sensitive points
 plus an even spread; the subset evaluation is verified against the full
-profile in float64). This needs `mpmath` at test time — **open question**.
+profile in float64). This needs `mpmath`, now in the `dev` group (decision 7).
 
 **Dephasing `custom_jvp` at degenerate points** (CEST_15N Liouvillian,
 on-resonance + B1; JVP along each of 7 parameter directions vs exact mpmath
@@ -592,6 +592,11 @@ the resampling/threading code is untouched by the port.
 4. The oligomerization root solve is hand-written (bracketed Newton +
    implicit-function `custom_jvp`); no `optimistix` dependency.
 5. `prototypes/` is not committed (kept locally as a reference/oracle).
+6. `expm` squaring budget may be raised (done: 16 → 20).
+7. `mpmath` is added to the `dev` dependency group (test-only exact
+   gradient reference; ChemEx itself does not depend on it).
+8. JAX test-suite runtime is accepted for now; revisit with Phase 4's
+   compiled-function caching. Per-residue `vmap` is a Phase 4 item.
 
 ## 8. Open questions (Phase 0, resolved above unless noted)
 

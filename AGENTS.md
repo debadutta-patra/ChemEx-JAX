@@ -369,7 +369,7 @@ Test commands:
 ```sh
 uv run pytest -q -n 8                                     # full upstream suite
 uv run python tests/backend/golden_outputs.py compare     # NumPy byte-identity
-uv run --with "jax>=0.11" --with mpmath pytest -q -n 10 -m jax tests/backend  # JAX parity (until the extra exists; ~30-60 min)
+uv run --with "jax>=0.11" pytest -q -n 10 -m jax tests/backend  # JAX parity (until the extra exists; ~30-60 min)
 ```
 
 Phase status: Phase 0 (baseline), Phase 1 (NMR engine) and Phase 2 (experiment
