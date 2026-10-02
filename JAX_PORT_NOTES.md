@@ -50,6 +50,16 @@ independent runs of the base commit agree on all 452 files (0 differences).
 `.golden/` and `.golden-check/` contain no timestamps or absolute paths
 outside `run_info/`.
 
+**Decision (maintainer, 2026-10-02):** all `*identity` values are excluded
+from golden comparisons, including the six that happen to be stable across
+runs (`policy_identity`, `accepted_evaluation_identity`,
+`constraint_program_identity`, `calibration_identity`,
+`evaluation_plan_identity`, `evaluator_parameterization_identity`).
+Identities are provenance (per-run `uuid4` occurrence ids and hashes chained
+from them, or fingerprints that also hash scientific-function *source files*
+via `parameterization.py::_source_record`), not scientific results. Numerical
+byte-identity is judged on every other value and file.
+
 ## 3. Upstream test baseline
 
 `uv run pytest -q -n 8` on `d0ba6e34`: **2310 passed** in 636 s (both the
