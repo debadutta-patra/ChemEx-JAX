@@ -1,3 +1,6 @@
+# Modified in the ChemEx-JAX fork (GPL-3.0-or-later): public read-only
+# `ActiveParameterization.ordered_constraints` accessor.
+
 """Immutable native parameter roles, constraints, and resolved scalar values.
 
 This module compiles active method roles for authoritative native evaluation
@@ -791,6 +794,13 @@ class ActiveParameterization:
     @property
     def independent_ids(self) -> tuple[str, ...]:
         return self.program.independent_ids
+
+    @property
+    def ordered_constraints(self) -> tuple[CompiledConstraint, ...]:
+        """Compiled constraints in program evaluation order (read-only)."""
+        # Added in the ChemEx-JAX fork: public accessor for alternative
+        # (backend-generic) evaluators of the same program.
+        return self._ordered_constraints
 
     @property
     def derived_ids(self) -> tuple[str, ...]:
