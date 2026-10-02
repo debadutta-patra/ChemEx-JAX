@@ -15,6 +15,10 @@ import numpy as np
 from chemex.backend import get_backend
 from chemex.containers.data import Data
 from chemex.containers.profile import Profile
+from chemex.parameters.parameterization import (
+    ActiveParameterization,
+    IndependentValueFrame,
+)
 
 
 def local_values(profile: Profile, values: Mapping[str, float]) -> dict[str, float]:
@@ -46,3 +50,39 @@ def make_local_function(
         return jnp.asarray(profile.pulse_sequence.calculate(spectrometer, kernel_data))
 
     return names, f
+
+
+def make_program_function(
+    profile: Profile,
+    parameterization: ActiveParameterization,
+    frame: IndependentValueFrame,
+) -> tuple[tuple[str, ...], Callable[..., object]]:
+    """Return ``(ids, f)`` with ``f(x)`` = unscaled profile from independent values.
+
+    ``ids`` are the independent parameters the profile depends on (program
+    order); the remaining independent values are fixed at ``frame``.  The
+    constraint program runs on the JAX backend, restricted to the constraints
+    the profile needs.
+    """
+    import jax.numpy as jnp
+
+    from chemex.parameters.program_evaluation import (
+        evaluate_program,
+        independent_dependencies,
+    )
+
+    backend = get_backend("jax")
+    targets = tuple(profile.name_map.values())
+    ids = independent_dependencies(parameterization, targets)
+    fixed = dict(frame._items)
+    names, local = make_local_function(profile)
+
+    def f(x: object) -> object:
+        independent = dict(fixed)
+        independent.update(zip(ids, list(x), strict=True))  # type: ignore[arg-type]
+        values = evaluate_program(
+            parameterization, independent, backend, targets=targets
+        )
+        return local(jnp.stack([values[profile.name_map[n]] for n in names]))
+
+    return ids, f

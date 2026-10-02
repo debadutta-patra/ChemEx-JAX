@@ -89,16 +89,19 @@ def build_example(
     group: str = "Experiments",
     script: str = "run.sh",
     root: Path = EXAMPLES,
+    model: str | None = None,
 ) -> BuiltExample:
     """Build experiments and resolved parameter values for one example.
 
-    ``root`` is ``EXAMPLES`` (shipped) or ``SYNTHETIC`` (``group`` ignored).
+    ``root`` is ``EXAMPLES`` (shipped) or ``SYNTHETIC`` (``group`` ignored);
+    ``model`` overrides the model named by the run script.
     """
     ensure_plugins_registered()
     example = root / name if root == SYNTHETIC else root / group / name
-    experiments_globs, parameter_globs, model, include = parse_run_script(
+    experiments_globs, parameter_globs, script_model, include = parse_run_script(
         example / script
     )
+    model = model or script_model
     cwd = Path.cwd()
     os.chdir(example)
     try:
@@ -145,7 +148,9 @@ def example_runs() -> list[tuple[str, str, str]]:
 
 def synthetic_examples() -> list[str]:
     """Synthetic mini-examples for experiment types without a shipped example."""
-    return sorted(p.parent.name for p in SYNTHETIC.glob("*/run.sh"))
+    return sorted(
+        p.parent.name for p in SYNTHETIC.glob("*/run.sh") if p.parent.name != "MODELS"
+    )
 
 
 def all_cases() -> list[str]:
@@ -165,3 +170,21 @@ def build_case(case: str) -> BuiltExample:
         return build_example(parts[1], root=SYNTHETIC)
     script = f"{parts[2]}.sh" if len(parts) > 2 else "run.sh"
     return build_example(parts[1], parts[0], script)
+
+
+def model_cases() -> list[str]:
+    """Every registered kinetic model, plain and with each extension."""
+    from chemex.models.factory import model_factory
+    from chemex.runtime import ensure_plugins_registered
+
+    ensure_plugins_registered()
+    return [
+        f"{name}{extension}"
+        for name in sorted(model_factory.setting_makers_registry)
+        for extension in ("", ".mf", ".rs", ".tc")
+    ]
+
+
+def build_model_case(model: str) -> BuiltExample:
+    """The synthetic CPMG 15N template built with ``model``."""
+    return build_example("MODELS", root=SYNTHETIC, model=model)

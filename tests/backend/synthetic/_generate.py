@@ -262,6 +262,38 @@ h_larmor_frq = 600.0
             "PB = 0.015", "PB = 0.3"
         ),
     )
+    ncycs = [0.0, 1.0, 2.0, 4.0, 8.0, 10.0, 20.0, 30.0]
+    _example(
+        "MODELS",
+        """
+[experiment]
+name = "cpmg_15n_ip"
+carrier = 118.5
+pw90 = 40.0e-6
+time_equil = 2.0e-3
+time_t2 = 30.0e-3
+
+[conditions]
+h_larmor_frq = 600.0
+temperature = 25.0
+p_total = 1.5e-3
+l_total = 1.0e-3
+d2o = 0.1
+""",
+        {n: f"{n}.out" for n in NITROGEN},
+        {
+            f"{n}.out": _columns(
+                [(c, 1.0e5, 1.0e3) for c in ncycs], "# ncyc Intensity Uncertainty"
+            )
+            for n in NITROGEN
+        },
+        """
+[CS_A]
+13N = 108.207
+43N = 108.876
+55N = 128.301
+""",
+    )
     for name, module, suffix in (
         ("SHIFT_15N_SQ", "shift_15n_sq", "N"),
         ("SHIFT_13C_SQ", "shift_13c_sq", "C"),

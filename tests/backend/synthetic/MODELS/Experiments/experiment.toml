@@ -1,0 +1,21 @@
+[experiment]
+name = "cpmg_15n_ip"
+carrier = 118.5
+pw90 = 40.0e-6
+time_equil = 2.0e-3
+time_t2 = 30.0e-3
+
+[conditions]
+h_larmor_frq = 600.0
+temperature = 25.0
+p_total = 1.5e-3
+l_total = 1.0e-3
+d2o = 0.1
+
+[data]
+path = "../Data/"
+error = "file"
+[data.profiles]
+13N = "13N.out"
+43N = "43N.out"
+55N = "55N.out"
