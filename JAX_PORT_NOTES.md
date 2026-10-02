@@ -470,10 +470,115 @@ finite. `vmap` *across residues* needs per-residue spectrometer constants
 (e.g. CEST_13C_LABEL_CN J-multiplets differ per carbon), i.e. the
 shape-grouped compilation of Phase 4, and is tested there.
 
+**Coverage (all 46 cases pass; one profile for gradients, three for forward).**
+"FD" is the worst NumPy-Richardson error over strong parameters that pass the
+brief's FD criterion; "exact (n)" is the worst error against the 30-digit
+reference for the n strong parameters whose NumPy FD was noise-limited. Weak
+parameters are reported by `tests/backend/report_parity.py`.
+
+| Case | Model | Experiment types | Fwd (3 prof.) | Worst strong grad: FD / exact (n) | jacfwd vs jacrev | Weak params (effect < 1e-6) |
+| --- | --- | --- | --- | --- | --- | --- |
+| Combinations/2stBinding | 2st_binding | cest_15n, cpmg_15n_ip | 2.0e-13 | 8.7e-07 | 3.3e-16 | 0 |
+| Combinations/CPMG_CH3_1H_DQ_TQ | 2st | cpmg_ch3_1h_dq, cpmg_ch3_1h_tq | 7.3e-14 | 7.1e-06 / 1.2e-12 (2 exact) | 1.9e-14 | 2 |
+| Combinations/N15_NH_RDC | 2st | cpmg_15n_ip, cpmg_15n_tr | 3.6e-14 | 7.6e-07 | 2.4e-15 | 0 |
+| Combinations/Shifts | 2st | cpmg_15n_ip, cpmg_1hn_ap, shift_15n_sqmq | 3.1e-11 | 4.0e-07 | 9.6e-16 | 0 |
+| Experiments/CEST_13C | 2st | cest_13c | 1.4e-13 | 7.0e-09 | 3.2e-15 | 0 |
+| Experiments/CEST_13C_LABEL_CN | 2st | cest_13c | 1.2e-14 | 1.2e-09 | 3.1e-16 | 0 |
+| Experiments/CEST_15N | 2st | cest_15n | 2.1e-14 | 4.3e-09 | 1.7e-16 | 0 |
+| Experiments/CEST_15N_CW | 2st.mf | cest_15n_cw | 3.8e-13 | 2.5e-06 / 4.6e-11 (8 exact) | 2.7e-16 | 4 |
+| Experiments/CEST_15N_LABEL_CN | 2st | cest_15n | 7.8e-15 | 9.2e-10 | 2.1e-16 | 0 |
+| Experiments/CEST_15N_TR | 2st.mf | cest_15n_tr | 1.5e-13 | 6.6e-08 | 1.1e-16 | 0 |
+| Experiments/CEST_1HN_AP | 2st | cest_1hn_ap | 6.5e-14 | 1.3e-06 | 2.0e-16 | 0 |
+| Experiments/CEST_1HN_IP_AP | 2st.rs | cest_1hn_ip_ap | 1.0e-11 | 5.9e-06 / 1.6e-11 (2 exact) | 2.3e-16 | 0 |
+| Experiments/CEST_CH3_1H_IP_AP | 2st.rs | cest_ch3_1h_ip_ap | 7.9e-12 | 6.8e-06 / 2.0e-12 (2 exact) | 2.5e-16 | 0 |
+| Experiments/COSCEST_1HN_IP_AP | 2st.rs | coscest_1hn_ip_ap | 8.4e-13 | 2.1e-06 / 2.9e-12 (1 exact) | 7.9e-16 | 0 |
+| Experiments/CPMG_13C_IP | 2st | cpmg_13c_ip | 8.7e-14 | 1.0e-06 | 4.9e-15 | 0 |
+| Experiments/CPMG_13CO_AP | 2st | cpmg_13co_ap | 2.2e-14 | 8.5e-07 / 1.7e-12 (2 exact) | 3.3e-15 | 3 |
+| Experiments/CPMG_15N_IP | 2st | cpmg_15n_ip | 4.5e-14 | 2.4e-07 | 1.9e-15 | 0 |
+| Experiments/CPMG_15N_IP_0013 | 2st | cpmg_15n_ip_0013 | 4.8e-14 | 1.4e-07 | 2.4e-15 | 0 |
+| Experiments/CPMG_15N_TR | 2st | cpmg_15n_tr | 8.7e-14 | 6.0e-07 | 1.8e-15 | 0 |
+| Experiments/CPMG_15N_TR_0013 | 2st | cpmg_15n_tr_0013 | 4.1e-14 | 4.6e-07 | 2.1e-15 | 0 |
+| Experiments/CPMG_1HN_AP | 2st | cpmg_1hn_ap | 1.0e-13 | 2.3e-06 / 2.4e-12 (1 exact) | 1.4e-14 | 2 |
+| Experiments/CPMG_1HN_AP_0013 | 2st | cpmg_1hn_ap_0013 | 1.8e-14 | 2.7e-07 / 2.2e-13 (1 exact) | 4.5e-15 | 2 |
+| Experiments/CPMG_CH3_13C_H2C | 2st | cpmg_ch3_13c_h2c | 4.4e-14 | 3.6e-06 / 3.0e-12 (3 exact) | 4.8e-15 | 2 |
+| Experiments/CPMG_CH3_13C_H2C_0013 | 2st | cpmg_ch3_13c_h2c_0013 | 3.0e-14 | 3.0e-06 | 6.1e-15 | 1 |
+| Experiments/CPMG_CH3_1H_SQ | 2st | cpmg_ch3_1h_sq | 2.8e-13 | 8.1e-06 / 3.3e-12 (1 exact) | 8.5e-15 | 2 |
+| Experiments/CPMG_CH3_1H_TQ | 2st | cpmg_ch3_1h_tq | 1.0e-13 | 3.5e-06 / 4.2e-12 (3 exact) | 2.8e-14 | 2 |
+| Experiments/CPMG_CH3_1H_TQ_DIFF | 2st | cpmg_ch3_1h_tq_diff | 2.1e-14 | 4.8e-06 / 2.7e-13 (1 exact) | 3.0e-14 | 1 |
+| Experiments/CPMG_CH3_MQ | 2st | cpmg_ch3_mq | 3.8e-14 | 1.2e-09 | 1.0e-17 | 2 |
+| Experiments/CPMG_CHD2_1H_AP | 2st | cpmg_chd2_1h_ap | 9.3e-14 | 7.2e-06 / 7.8e-12 (1 exact) | 8.3e-15 | 3 |
+| Experiments/CPMG_HN_DQ_ZQ | 2st | cpmg_hn_dq_zq | 1.3e-13 | 7.4e-06 / 1.2e-12 (3 exact) | 2.5e-14 | 10 |
+| Experiments/DCEST_15N | 2st | dcest_15n | 3.2e-14 | 4.4e-07 | 7.7e-16 | 0 |
+| Experiments/DCEST_15N_3States/run_FIFU | 3st_fork | dcest_15n | 1.5e-13 | 3.6e-06 | 6.5e-16 | 0 |
+| Experiments/DCEST_15N_3States/run_FIFU_drd | 3st_fork | dcest_15n | 1.3e-13 | 3.6e-06 | 6.5e-16 | 0 |
+| Experiments/DCEST_15N_3States/run_FIU | 3st_linear | dcest_15n | 1.4e-13 | 4.7e-06 | 8.4e-16 | 0 |
+| Experiments/DCEST_15N_3States/run_FIU_drd | 3st_linear | dcest_15n | 1.3e-13 | 4.7e-06 | 8.4e-16 | 0 |
+| Experiments/DCEST_15N_HD_EXCH | 2st_hd | dcest_15n | 2.9e-14 | 2.7e-07 | 1.1e-15 | 0 |
+| Experiments/RELAXATION_HZNZ | 2st | relaxation_hznz | 1.4e-15 | 4.6e-09 | 1.7e-17 | 0 |
+| Experiments/RELAXATION_NZ | 2st | relaxation_nz | 1.2e-16 | 5.3e-13 | 3.0e-17 | 0 |
+| synthetic/CEST_15N_TEST | 2st | cest_15n_test | 5.8e-14 | 6.9e-07 | 8.7e-16 | 0 |
+| synthetic/COSCEST_13C | 2st | coscest_13c | 3.1e-13 | 1.4e-08 | 4.0e-15 | 0 |
+| synthetic/DCEST_13C | 2st | dcest_13c | 9.0e-14 | 7.6e-09 | 1.9e-15 | 0 |
+| synthetic/NOESYFPGPPH19 | 2st | noesyfpgpph19 | 3.2e-16 | 3.8e-12 | 6.9e-18 | 0 |
+| synthetic/RELAXATION_15N_R1RHO | 2st | wip.relaxation_15n_r1rho | 1.9e-14 | 2.0e-08 | 1.1e-15 | 0 |
+| synthetic/RELAXATION_15N_R1RHO_EIG | 2st | wip.relaxation_15n_r1rho_eig | 2.2e-15 | 8.7e-09 | 1.8e-16 | 0 |
+| synthetic/SHIFT_13C_SQ | 2st | shift_13c_sq | 1.3e-16 | 4.8e-07 | 5.3e-18 | 0 |
+| synthetic/SHIFT_15N_SQ | 2st | shift_15n_sq | 1.2e-16 | 6.1e-07 | 1.1e-16 | 0 |
+
+Experiment-type coverage (37 registered types):
+
+| Experiment type | Covered by |
+| --- | --- |
+| `cest_13c` | Experiments/CEST_13C, Experiments/CEST_13C_LABEL_CN |
+| `cest_15n` | Combinations/2stBinding, Experiments/CEST_15N, Experiments/CEST_15N_LABEL_CN |
+| `cest_15n_cw` | Experiments/CEST_15N_CW |
+| `cest_15n_test` | synthetic/CEST_15N_TEST |
+| `cest_15n_tr` | Experiments/CEST_15N_TR |
+| `cest_1hn_ap` | Experiments/CEST_1HN_AP |
+| `cest_1hn_ip_ap` | Experiments/CEST_1HN_IP_AP |
+| `cest_ch3_1h_ip_ap` | Experiments/CEST_CH3_1H_IP_AP |
+| `coscest_13c` | synthetic/COSCEST_13C |
+| `coscest_1hn_ip_ap` | Experiments/COSCEST_1HN_IP_AP |
+| `cpmg_13c_ip` | Experiments/CPMG_13C_IP |
+| `cpmg_13co_ap` | Experiments/CPMG_13CO_AP |
+| `cpmg_15n_ip` | Combinations/2stBinding, Combinations/N15_NH_RDC, Combinations/Shifts, Experiments/CPMG_15N_IP |
+| `cpmg_15n_ip_0013` | Experiments/CPMG_15N_IP_0013 |
+| `cpmg_15n_tr` | Combinations/N15_NH_RDC, Experiments/CPMG_15N_TR |
+| `cpmg_15n_tr_0013` | Experiments/CPMG_15N_TR_0013 |
+| `cpmg_1hn_ap` | Combinations/Shifts, Experiments/CPMG_1HN_AP |
+| `cpmg_1hn_ap_0013` | Experiments/CPMG_1HN_AP_0013 |
+| `cpmg_ch3_13c_h2c` | Experiments/CPMG_CH3_13C_H2C |
+| `cpmg_ch3_13c_h2c_0013` | Experiments/CPMG_CH3_13C_H2C_0013 |
+| `cpmg_ch3_1h_dq` | Combinations/CPMG_CH3_1H_DQ_TQ |
+| `cpmg_ch3_1h_sq` | Experiments/CPMG_CH3_1H_SQ |
+| `cpmg_ch3_1h_tq` | Combinations/CPMG_CH3_1H_DQ_TQ, Experiments/CPMG_CH3_1H_TQ |
+| `cpmg_ch3_1h_tq_diff` | Experiments/CPMG_CH3_1H_TQ_DIFF |
+| `cpmg_ch3_mq` | Experiments/CPMG_CH3_MQ |
+| `cpmg_chd2_1h_ap` | Experiments/CPMG_CHD2_1H_AP |
+| `cpmg_hn_dq_zq` | Experiments/CPMG_HN_DQ_ZQ |
+| `dcest_13c` | synthetic/DCEST_13C |
+| `dcest_15n` | Experiments/DCEST_15N, Experiments/DCEST_15N_3States/run_FIFU, Experiments/DCEST_15N_3States/run_FIFU_drd, Experiments/DCEST_15N_3States/run_FIU, Experiments/DCEST_15N_3States/run_FIU_drd, Experiments/DCEST_15N_HD_EXCH |
+| `noesyfpgpph19` | synthetic/NOESYFPGPPH19 |
+| `relaxation_hznz` | Experiments/RELAXATION_HZNZ |
+| `relaxation_nz` | Experiments/RELAXATION_NZ |
+| `shift_13c_sq` | synthetic/SHIFT_13C_SQ |
+| `shift_15n_sq` | synthetic/SHIFT_15N_SQ |
+| `shift_15n_sqmq` | Combinations/Shifts |
+| `wip.relaxation_15n_r1rho` | synthetic/RELAXATION_15N_R1RHO |
+| `wip.relaxation_15n_r1rho_eig` | synthetic/RELAXATION_15N_R1RHO_EIG |
+
 **Test runtime.** Compilation dominates: COSCEST_1HN_IP_AP takes ~110 s per
 `jit` compile (Python loops over offsets × shaped-pulse slices are unrolled).
 The full backend suite took 60 min on 10 workers before the exact reference
-was restricted to a row subset (CEST_15N_CW gradients: 55 min → 6 min).
+was restricted to a row subset (CEST_15N_CW gradients: 55 min → 6 min); the
+46 gradient tests now take 19.5 min on 10 workers.
+
+**Intermittent upstream failure (not reproduced).** One full-suite run
+(`-n 10`) failed `tests/test_native_resampling.py::test_serial_and_reordered_multi_worker_execution_use_fresh_single_owners`
+(traceback not captured). It passed in isolation (3/3), in a second full run,
+and in 60 stress runs at 10-way concurrency (30 on `d0ba6e34`, 30 on this
+branch). The test synchronises 4 replicate threads with 5 s wall-clock waits;
+the resampling/threading code is untouched by the port.
 
 ## 7. Decisions (maintainer, 2026-10-02)
 
