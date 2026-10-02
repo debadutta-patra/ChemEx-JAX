@@ -1,3 +1,6 @@
+# Modified in the ChemEx-JAX fork (GPL-3.0-or-later): array operations on
+# propagators and magnetization go through the spectrometer backend.
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -77,7 +80,7 @@ class Noesyfpgpph19Sequence:
             spectrometer.detection = f"[iz_{state2}]"
             intensities.append(spectrometer.detect(delay @ start))
 
-        return np.array(intensities)
+        return spectrometer.backend.stack(intensities)
 
     def is_reference(self, metadata: Array) -> Array:
         return np.full_like(metadata, fill_value=False, dtype=np.bool_)

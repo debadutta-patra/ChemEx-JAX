@@ -1,5 +1,9 @@
+# Modified in the ChemEx-JAX fork (GPL-3.0-or-later): array operations on
+# propagators and magnetization go through the spectrometer backend.
+
 from __future__ import annotations
 
+import operator
 from functools import reduce
 from typing import Literal
 
@@ -241,17 +245,17 @@ class CpmgCh313CH2c0013Sequence:
                 d_eq
                 @ d_delta[0]
                 @ p90[0]
-                @ p180[[0, 3]]
+                @ p180[np.array([0, 3])]
                 @ d_pos
-                @ p180[[2, 3]]
+                @ p180[np.array([2, 3])]
                 @ (p90[0] - p90[2])
                 * 0.5
                 @ p_element
                 @ d_delta[0]
                 @ p90[0]
-                @ p180[[1, 0]]
+                @ p180[np.array([1, 0])]
                 @ d_pos
-                @ p180[[1, 2]]
+                @ p180[np.array([1, 2])]
                 @ (p90[0] - p90[2])
                 * 0.5
                 @ d_eq
@@ -267,13 +271,13 @@ class CpmgCh313CH2c0013Sequence:
 
             echo = d_cp[ncyc] @ p180 @ d_cp[ncyc]
             if ncyc_1 > 0:
-                cpmg1 = d_neg @ reduce(np.matmul, echo[phases1.T]) @ d_neg
-                cpmg2 = d_neg @ reduce(np.matmul, echo[phases2.T]) @ d_neg
+                cpmg1 = d_neg @ reduce(operator.matmul, echo[phases1.T]) @ d_neg
+                cpmg2 = d_neg @ reduce(operator.matmul, echo[phases2.T]) @ d_neg
             else:
-                cpmg1 = p180[[1, 0]] @ d_pos @ p180[[1, 2]]
-                cpmg2 = p180[[0, 3]] @ d_pos @ p180[[2, 3]]
-            cpmg3 = d_neg @ reduce(np.matmul, echo[phases3.T]) @ d_neg
-            cpmg4 = d_neg @ reduce(np.matmul, echo[phases4.T]) @ d_neg
+                cpmg1 = p180[np.array([1, 0])] @ d_pos @ p180[np.array([1, 2])]
+                cpmg2 = p180[np.array([0, 3])] @ d_pos @ p180[np.array([2, 3])]
+            cpmg3 = d_neg @ reduce(operator.matmul, echo[phases3.T]) @ d_neg
+            cpmg4 = d_neg @ reduce(operator.matmul, echo[phases4.T]) @ d_neg
 
             if int(ncyc) % 2 == 0:
                 if int(ncyc_1) % 4 == 0:
@@ -384,7 +388,7 @@ class CpmgCh313CH2c0013Sequence:
             intensities[ncyc] = (intst1 + intst2) * 0.5
 
         # Return profile
-        return np.array([intensities[ncyc] for ncyc in ncycs])
+        return spectrometer.backend.stack([intensities[ncyc] for ncyc in ncycs])
 
     @staticmethod
     def is_reference(metadata: Array) -> Array:

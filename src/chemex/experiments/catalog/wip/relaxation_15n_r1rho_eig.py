@@ -1,3 +1,6 @@
+# Modified in the ChemEx-JAX fork (GPL-3.0-or-later): array operations on
+# propagators and magnetization go through the spectrometer backend.
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -83,7 +86,7 @@ class Relaxation15NR1RhoSequence:
         r1rho = spectrometer.analysis.calculate_r1rho()
 
         # Return profile
-        return np.exp(-r1rho * times)
+        return spectrometer.xp.exp(-r1rho * times)
 
     def is_reference(self, metadata: Array) -> Array:
         return np.full_like(metadata, fill_value=False, dtype=np.bool_)

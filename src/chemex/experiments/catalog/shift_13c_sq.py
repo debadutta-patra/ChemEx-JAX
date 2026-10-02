@@ -1,5 +1,9 @@
+# Modified in the ChemEx-JAX fork (GPL-3.0-or-later): array operations on
+# propagators and magnetization go through the spectrometer backend.
+
 from __future__ import annotations
 
+from types import ModuleType
 from typing import Literal
 
 import numpy as np
@@ -54,9 +58,9 @@ def build_spectrometer(
     return Spectrometer.from_spin_system(spin_system, basis, conditions)
 
 
-def _find_nearest(array: Array, value: float) -> float:
-    array = np.asarray(array)
-    idx = (np.abs(array - value)).argmin()
+def _find_nearest(array: Array, value: float, xp: ModuleType = np) -> float:
+    array = xp.asarray(array)
+    idx = (xp.abs(array - value)).argmin()
     return array[idx]
 
 
@@ -70,8 +74,8 @@ class Shift13CSqSequence:
         ppm_i = spectrometer.ppm_i
         ref_shift_i = spectrometer.par_values[self.settings.cs_i_name] * ppm_i
         shifts = spectrometer.analysis.calculate_shifts()
-        shift_sq = _find_nearest(shifts, ref_shift_i)
-        return np.array([shift_sq / ppm_i])
+        shift_sq = _find_nearest(shifts, ref_shift_i, spectrometer.xp)
+        return spectrometer.backend.stack([shift_sq / ppm_i])
 
     def is_reference(self, metadata: Array) -> Array:
         return np.full_like(metadata, fill_value=False, dtype=np.bool_)

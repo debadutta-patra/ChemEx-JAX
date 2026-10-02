@@ -1,3 +1,6 @@
+# Modified in the ChemEx-JAX fork (GPL-3.0-or-later): array operations on
+# propagators and magnetization go through the spectrometer backend.
+
 from __future__ import annotations
 
 from typing import Literal
@@ -124,7 +127,7 @@ class CestCh31HIpApSequence:
                 mag = inept @ mag
             intensities[offset] = spectrometer.detect(mag)
 
-        return np.array([intensities[offset] for offset in offsets])
+        return spectrometer.backend.stack([intensities[offset] for offset in offsets])
 
 
 def create_profile_calculation(

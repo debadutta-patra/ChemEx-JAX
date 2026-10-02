@@ -1,9 +1,11 @@
+# Modified in the ChemEx-JAX fork (GPL-3.0-or-later): array operations on
+# propagators and magnetization go through the spectrometer backend.
+
 from __future__ import annotations
 
 from typing import Literal
 
 import numpy as np
-from numpy.linalg import matrix_power
 from pydantic import Field, computed_field
 
 from chemex.configuration.base import ExperimentConfiguration, ToBeFitted
@@ -140,7 +142,7 @@ class Cpmg15NTrSequence:
         palmer0 = (
             p180_sx @ d_taub @ p90[p1] @ p90[p2] @ p180_sx @ p90[p2] @ p90[p1] @ d_taub
         )
-        palmer = np.mean(p90[[0, 2]] @ palmer0 @ p90[[1, 3]], axis=0)
+        palmer = (p90[np.array([0, 2])] @ palmer0 @ p90[np.array([1, 3])]).mean(axis=0)
 
         # Calculating the instensities as a function of ncyc
         part1 = p90[0] @ start
@@ -149,12 +151,14 @@ class Cpmg15NTrSequence:
         intst = {0.0: spectrometer.detect(part2 @ palmer0 @ part1)}
 
         for ncyc in set(ncycs) - {0.0}:
-            echo = d_cp[ncyc] @ p180[[1, 0]] @ d_cp[ncyc]
-            cpmg1, cpmg2 = d_neg @ matrix_power(echo, int(ncyc)) @ d_neg
+            echo = d_cp[ncyc] @ p180[np.array([1, 0])] @ d_cp[ncyc]
+            cpmg1, cpmg2 = (
+                d_neg @ spectrometer.backend.matrix_power(echo, int(ncyc)) @ d_neg
+            )
             intst[ncyc] = spectrometer.detect(part2 @ cpmg2 @ palmer @ cpmg1 @ part1)
 
         # Return profile
-        return np.array([intst[ncyc] for ncyc in ncycs])
+        return spectrometer.backend.stack([intst[ncyc] for ncyc in ncycs])
 
     @staticmethod
     def is_reference(metadata: Array) -> Array:

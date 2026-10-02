@@ -1,5 +1,9 @@
+# Modified in the ChemEx-JAX fork (GPL-3.0-or-later): array operations on
+# propagators and magnetization go through the spectrometer backend.
+
 from __future__ import annotations
 
+import operator
 from functools import reduce
 from typing import Literal
 
@@ -202,7 +206,9 @@ class CpmgCh31HTqDiffSequence:
             p180_cp1 = p180_cp2 = p180_4
 
         # The liouvillian for evolution before and after the CPMG period
-        p180_grad1, p180_grad2 = p90_2[[1, 3]] @ p180_2[0] @ p90_2[[1, 3]]
+        p180_grad1, p180_grad2 = (
+            p90_2[np.array([1, 3])] @ p180_2[0] @ p90_2[np.array([1, 3])]
+        )
         grad1 = d_tau_4 @ d_delta_3 @ p180_grad1 @ d_tau_2 @ d_delta_1
         grad2 = d_tau_0 @ d_delta_1 @ p180_grad2 @ d_tau_2 @ d_delta_3
         if self.settings.ipap_flg:
@@ -222,15 +228,15 @@ class CpmgCh31HTqDiffSequence:
             phases1, phases2 = self._get_phases(ncyc)
             echo1 = d_cp_4[ncyc] @ p180_cp1 @ d_cp_4[ncyc]
             echo2 = d_cp_4[ncyc] @ p180_cp2 @ d_cp_4[ncyc]
-            cpmg1 = reduce(np.matmul, echo1[phases1])
-            cpmg2 = reduce(np.matmul, echo2[phases2])
+            cpmg1 = reduce(operator.matmul, echo1[phases1])
+            cpmg2 = reduce(operator.matmul, echo2[phases2])
             centre = grad2 @ cpmg2 @ p180pmy_4 @ cpmg1 @ grad1
             if self.settings.ipap_flg:
                 centre = 0.5 * (centre + p180_sx @ centre @ p180_sx)
             intst[ncyc] = spectrometer.detect(part2 @ centre @ part1)
 
         # Return profile
-        return np.array([intst[ncyc] for ncyc in ncycs])
+        return spectrometer.backend.stack([intst[ncyc] for ncyc in ncycs])
 
     @staticmethod
     def is_reference(metadata: Array) -> Array:

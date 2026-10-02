@@ -1,9 +1,11 @@
+# Modified in the ChemEx-JAX fork (GPL-3.0-or-later): array operations on
+# propagators and magnetization go through the spectrometer backend.
+
 from __future__ import annotations
 
 from typing import Literal
 
 import numpy as np
-from numpy.linalg import matrix_power
 from pydantic import Field, computed_field, model_validator
 
 from chemex.configuration.base import ExperimentConfiguration, ToBeFitted
@@ -154,13 +156,13 @@ class Cpmg13CoApSequence:
 
         for ncyc in set(ncycs) - {0.0}:
             echo = d_cp[ncyc] @ perfect180x @ d_cp[ncyc]
-            cpmg = matrix_power(echo, int(ncyc))
+            cpmg = spectrometer.backend.matrix_power(echo, int(ncyc))
             intensities[ncyc] = spectrometer.detect(
                 part2 @ cpmg @ p_flip @ cpmg @ part1,
             )
 
         # Return profile
-        return np.array([intensities[ncyc] for ncyc in ncycs])
+        return spectrometer.backend.stack([intensities[ncyc] for ncyc in ncycs])
 
     @staticmethod
     def is_reference(metadata: Array) -> Array:

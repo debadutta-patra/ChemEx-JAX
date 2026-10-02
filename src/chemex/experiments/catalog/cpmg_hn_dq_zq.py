@@ -1,5 +1,9 @@
+# Modified in the ChemEx-JAX fork (GPL-3.0-or-later): array operations on
+# propagators and magnetization go through the spectrometer backend.
+
 from __future__ import annotations
 
+import operator
 from functools import reduce
 from typing import Literal
 
@@ -145,8 +149,8 @@ class CpmgHNDqZqSequence:
         d_cp = dict(zip(ncyc_list, spectrometer.delays(delay_list), strict=True))
 
         # Calculation of the spectrometers corresponding to all the pulses
-        p9024090_1 = spectrometer.p9024090_nh_1[[0, 1], [0, 1]]
-        p9024090_2 = spectrometer.p9024090_nh_2[[0, 1], [0, 1]]
+        p9024090_1 = spectrometer.p9024090_nh_1[np.array([0, 1]), np.array([0, 1])]
+        p9024090_2 = spectrometer.p9024090_nh_2[np.array([0, 1]), np.array([0, 1])]
 
         # Getting the starting magnetization
         start = spectrometer.get_start_magnetization(self.settings.start_terms)
@@ -157,12 +161,12 @@ class CpmgHNDqZqSequence:
             phases1, phases2 = self._get_phases(ncyc)
             echo1 = d_cp[ncyc] @ p9024090_1 @ d_cp[ncyc]
             echo2 = d_cp[ncyc] @ p9024090_2 @ d_cp[ncyc]
-            cpmg1 = reduce(np.matmul, echo1[phases1])
-            cpmg2 = reduce(np.matmul, echo2[phases2])
+            cpmg1 = reduce(operator.matmul, echo1[phases1])
+            cpmg2 = reduce(operator.matmul, echo2[phases2])
             intensities[ncyc] = spectrometer.detect(0.5 * (cpmg1 + cpmg2) @ start)
 
         # Return profile
-        return np.array([intensities[ncyc] for ncyc in ncycs])
+        return spectrometer.backend.stack([intensities[ncyc] for ncyc in ncycs])
 
     @staticmethod
     def is_reference(metadata: Array) -> Array:

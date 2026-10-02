@@ -1,5 +1,9 @@
+# Modified in the ChemEx-JAX fork (GPL-3.0-or-later): array operations on
+# propagators and magnetization go through the spectrometer backend.
+
 from __future__ import annotations
 
+import operator
 from functools import reduce
 from typing import ClassVar, Literal
 
@@ -211,15 +215,17 @@ class Cpmg1HnAp0013Sequence:
 
         # Calculating the central refocusing block
         if self.settings.eburp_flg:
-            p180pmy = p180[[1, 3]]
-            pp90pmy = spectrometer.perfect90_i[[1, 3]]
+            p180pmy = p180[np.array([1, 3])]
+            pp90pmy = spectrometer.perfect90_i[np.array([1, 3])]
             e180e_pmy = pp90pmy @ d_eburp @ p180pmy @ d_eburp @ pp90pmy
-            middle = np.stack([p180pmy @ e180e_pmy, e180e_pmy @ p180pmy])
+            middle = spectrometer.backend.stack(
+                [p180pmy @ e180e_pmy, e180e_pmy @ p180pmy]
+            )
         elif self.settings.reburp_flg:
-            pp180pmy = spectrometer.perfect180_i[[1, 3]]
+            pp180pmy = spectrometer.perfect180_i[np.array([1, 3])]
             middle = d_reburp @ pp180pmy @ d_reburp
         else:
-            middle = p180[[1, 3]]
+            middle = p180[np.array([1, 3])]
 
         # Calculating the intensities as a function of ncyc
         centre = {0.0: d_eq_2 @ d_delta[0] @ p90[0] @ middle @ p90[0] @ d_eq_1}
@@ -227,8 +233,8 @@ class Cpmg1HnAp0013Sequence:
         for ncyc in set(ncycs) - {0.0}:
             phases1, phases2 = self._get_phases(ncyc)
             echo = d_cp[ncyc] @ p180 @ d_cp[ncyc]
-            cpmg1 = reduce(np.matmul, echo[phases1.T])
-            cpmg2 = reduce(np.matmul, echo[phases2.T])
+            cpmg1 = reduce(operator.matmul, echo[phases1.T])
+            cpmg2 = reduce(operator.matmul, echo[phases2.T])
             centre[ncyc] = (
                 d_eq_2
                 @ d_delta[ncyc]
@@ -255,7 +261,7 @@ class Cpmg1HnAp0013Sequence:
             }
 
         # Return profile
-        return np.array([intst[ncyc] for ncyc in ncycs])
+        return spectrometer.backend.stack([intst[ncyc] for ncyc in ncycs])
 
     @staticmethod
     def is_reference(metadata: Array) -> Array:

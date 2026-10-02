@@ -1,5 +1,9 @@
+# Modified in the ChemEx-JAX fork (GPL-3.0-or-later): array operations on
+# propagators and magnetization go through the spectrometer backend.
+
 from __future__ import annotations
 
+import operator
 from functools import reduce
 from typing import Literal
 
@@ -152,15 +156,15 @@ class CpmgCh31HTqSequence:
             phases1, phases2 = self._get_phases(ncyc)
             echo1 = d_cp[ncyc] @ p180_cp1 @ d_cp[ncyc]
             echo2 = d_cp[ncyc] @ p180_cp2 @ d_cp[ncyc]
-            cpmg1 = reduce(np.matmul, echo1[phases1])
-            cpmg2 = reduce(np.matmul, echo2[phases2])
+            cpmg1 = reduce(operator.matmul, echo1[phases1])
+            cpmg2 = reduce(operator.matmul, echo2[phases2])
             centre = cpmg2 @ p180pmy @ cpmg1
             if self.settings.ipap_flg:
                 centre = 0.5 * (centre + p180_sx @ centre @ p180_sx)
             intensities[ncyc] = spectrometer.detect(part2 @ centre @ part1)
 
         # Return profile
-        return np.array([intensities[ncyc] for ncyc in ncycs])
+        return spectrometer.backend.stack([intensities[ncyc] for ncyc in ncycs])
 
     @staticmethod
     def is_reference(metadata: Array) -> Array:

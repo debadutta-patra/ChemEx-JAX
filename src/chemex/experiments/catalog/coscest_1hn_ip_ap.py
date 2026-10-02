@@ -1,9 +1,11 @@
+# Modified in the ChemEx-JAX fork (GPL-3.0-or-later): array operations on
+# propagators and magnetization go through the spectrometer backend.
+
 from __future__ import annotations
 
 from typing import Literal
 
 import numpy as np
-from numpy.linalg import matrix_power
 from pydantic import Field, computed_field
 
 from chemex.configuration.base import ExperimentConfiguration, ToBeFitted
@@ -126,7 +128,9 @@ class CosCest1HnIpApSequence:
 
         base_pulse = spectrometer.shaped_pulse_i(cos_res * dt, amplitudes, phases)
 
-        pulse = matrix_power(base_pulse[0] @ base_pulse[phase1], double_periods)
+        pulse = spectrometer.backend.matrix_power(
+            base_pulse[0] @ base_pulse[phase1], double_periods
+        )
 
         if extra_period:
             pulse = base_pulse[phase1] @ pulse
@@ -168,7 +172,7 @@ class CosCest1HnIpApSequence:
                 cest = self._calc_cosine_shape(spectrometer)
             intensities[offset] = spectrometer.detect(cest @ start)
 
-        return np.array([intensities[offset] for offset in offsets])
+        return spectrometer.backend.stack([intensities[offset] for offset in offsets])
 
 
 def create_profile_calculation(

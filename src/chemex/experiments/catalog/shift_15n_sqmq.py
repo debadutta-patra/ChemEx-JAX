@@ -1,5 +1,9 @@
+# Modified in the ChemEx-JAX fork (GPL-3.0-or-later): array operations on
+# propagators and magnetization go through the spectrometer backend.
+
 from __future__ import annotations
 
+from types import ModuleType
 from typing import Literal
 
 import numpy as np
@@ -53,9 +57,9 @@ def build_spectrometer(
     return Spectrometer.from_spin_system(spin_system, basis, conditions)
 
 
-def _find_nearest(array: Array, value: float) -> float:
-    array = np.asarray(array)
-    idx = (np.abs(array - value)).argmin()
+def _find_nearest(array: Array, value: float, xp: ModuleType = np) -> float:
+    array = xp.asarray(array)
+    idx = (xp.abs(array - value)).argmin()
     return array[idx]
 
 
@@ -76,10 +80,10 @@ class Shift15NSqMqSequence:
         ref_shift_dq = ref_shift_i + ref_shift_s
         ref_shift_zq = ref_shift_i - ref_shift_s
         shifts = spectrometer.analysis.calculate_shifts()
-        shift_sq = _find_nearest(shifts, ref_shift_i)
-        shift_dq = _find_nearest(shifts, ref_shift_dq)
-        shift_zq = _find_nearest(shifts, ref_shift_zq)
-        return np.array(
+        shift_sq = _find_nearest(shifts, ref_shift_i, spectrometer.xp)
+        shift_dq = _find_nearest(shifts, ref_shift_dq, spectrometer.xp)
+        shift_zq = _find_nearest(shifts, ref_shift_zq, spectrometer.xp)
+        return spectrometer.backend.stack(
             [
                 1e3 * (shift_sq - 0.5 * (shift_dq + shift_zq)) / spectrometer.ppm_i,
             ],

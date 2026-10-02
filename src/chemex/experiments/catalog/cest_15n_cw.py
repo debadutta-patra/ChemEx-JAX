@@ -1,3 +1,6 @@
+# Modified in the ChemEx-JAX fork (GPL-3.0-or-later): array operations on
+# propagators and magnetization go through the spectrometer backend.
+
 from __future__ import annotations
 
 from typing import Literal
@@ -131,7 +134,7 @@ class Cest15NCwSequence:
                 @ intensities[offset]
             )
 
-        return np.array(
+        return spectrometer.backend.stack(
             [spectrometer.detect(intensities[offset]) for offset in offsets],
         )
 

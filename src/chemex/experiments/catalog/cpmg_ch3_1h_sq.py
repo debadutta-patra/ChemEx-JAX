@@ -1,5 +1,9 @@
+# Modified in the ChemEx-JAX fork (GPL-3.0-or-later): array operations on
+# propagators and magnetization go through the spectrometer backend.
+
 from __future__ import annotations
 
+import operator
 from functools import reduce
 from typing import ClassVar, Literal
 
@@ -165,11 +169,11 @@ class CpmgCh31HSqSequence:
             phases2_2 = phases2.T[int(ncyc) :]
             echo1 = d_cp[ncyc] @ p180_cp1 @ d_cp[ncyc]
             echo2 = d_cp[ncyc] @ p180_cp2 @ d_cp[ncyc]
-            cpmg1 = reduce(np.matmul, echo1[phases1_1])
-            cpmg2 = reduce(np.matmul, echo2[phases2_1])
+            cpmg1 = reduce(operator.matmul, echo1[phases1_1])
+            cpmg2 = reduce(operator.matmul, echo2[phases2_1])
             if ncyc < self.settings.ncyc_max:
-                cpmg1 = reduce(np.matmul, p180_cp1[phases1_2]) @ cpmg1
-                cpmg2 = cpmg2 @ reduce(np.matmul, p180_cp2[phases2_2])
+                cpmg1 = reduce(operator.matmul, p180_cp1[phases1_2]) @ cpmg1
+                cpmg2 = cpmg2 @ reduce(operator.matmul, p180_cp2[phases2_2])
             centre = cpmg2 @ p180pmy @ cpmg1
             if self.settings.ipap_flg:
                 intensities[ncyc] = spectrometer.detect(
@@ -181,7 +185,7 @@ class CpmgCh31HSqSequence:
                 )
 
         # Return profile
-        return np.array([intensities[ncyc] for ncyc in ncycs])
+        return spectrometer.backend.stack([intensities[ncyc] for ncyc in ncycs])
 
     @staticmethod
     def is_reference(metadata: Array) -> Array:
