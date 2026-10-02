@@ -111,3 +111,7 @@ Sandbox/
 
 # Generated Graphify knowledge graph
 graphify-out/
+
+# ChemEx-JAX fork: golden-output scratch directories
+.golden/
+.golden-check/
