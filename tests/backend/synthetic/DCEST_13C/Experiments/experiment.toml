@@ -1,0 +1,19 @@
+[experiment]
+name = "dcest_13c"
+time_t1 = 0.5
+carrier = 20.0
+pw90 = 15e-6
+sw = 800.0
+b1_eff = 25.0
+b1_distribution = { type = "gaussian", scale = 0.1, res = 3 }
+
+[conditions]
+h_larmor_frq = 600.0
+
+[data]
+path = "../Data/"
+error = "file"
+[data.profiles]
+L7CD2 = "L7CD2.out"
+I28CD1 = "I28CD1.out"
+V58CG2 = "V58CG2.out"

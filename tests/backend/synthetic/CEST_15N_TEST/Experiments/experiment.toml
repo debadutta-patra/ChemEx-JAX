@@ -1,0 +1,18 @@
+[experiment]
+name = "cest_15n_test"
+time_t1 = 0.5
+carrier = 118.987
+b1_frq = 26.3
+b1_inh_scale = 0.1
+b1_inh_res = 3
+
+[conditions]
+h_larmor_frq = 499.243
+
+[data]
+path = "../Data/"
+error = "file"
+[data.profiles]
+13N = "13N.out"
+43N = "43N.out"
+55N = "55N.out"

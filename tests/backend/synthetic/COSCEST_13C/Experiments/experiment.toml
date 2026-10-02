@@ -1,0 +1,20 @@
+[experiment]
+name = "coscest_13c"
+time_t1 = 0.3
+carrier = 20.0
+sw = 800.0
+cos_n = 3
+cos_res = 10
+b1_frq = 20.0
+b1_distribution = { type = "gaussian", scale = 0.1, res = 3 }
+
+[conditions]
+h_larmor_frq = 600.0
+
+[data]
+path = "../Data/"
+error = "file"
+[data.profiles]
+L7CD2 = "L7CD2.out"
+I28CD1 = "I28CD1.out"
+V58CG2 = "V58CG2.out"

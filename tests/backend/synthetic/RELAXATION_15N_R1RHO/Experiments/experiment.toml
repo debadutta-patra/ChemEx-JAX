@@ -1,0 +1,16 @@
+[experiment]
+name = "wip.relaxation_15n_r1rho"
+carrier = 118.0
+b1_frq = 1500.0
+b1_distribution = { type = "gaussian", res = 3, scale = 0.1 }
+
+[conditions]
+h_larmor_frq = 600.0
+
+[data]
+path = "../Data/"
+error = "file"
+[data.profiles]
+13N = "13N.out"
+43N = "43N.out"
+55N = "55N.out"

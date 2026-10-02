@@ -22,9 +22,11 @@ from chemex.parameters.parameterization import (
     IndependentValueFrame,
     ResolvedParameterValues,
 )
+from chemex.parameters.spin_system import SpinSystem
 from chemex.runtime import AnalysisSession, ensure_plugins_registered
 
 EXAMPLES = Path(__file__).resolve().parents[2] / "examples"
+SYNTHETIC = Path(__file__).resolve().parent / "synthetic"
 
 
 @dataclass(frozen=True)
@@ -45,11 +47,13 @@ class BuiltExample:
         profiles = self.profiles
         if len(profiles) <= count:
             return profiles
+        if count == 1:
+            return profiles[:1]
         step = (len(profiles) - 1) / (count - 1)
         return [profiles[round(i * step)] for i in range(count)]
 
 
-def _parse_run_sh(path: Path) -> tuple[list[str], list[str], str, list[str]]:
+def parse_run_script(path: Path) -> tuple[list[str], list[str], str, list[str]]:
     text = path.read_text().replace("\\\n", " ")
     variables = {}
     for line in text.splitlines():
@@ -80,19 +84,29 @@ def _parse_run_sh(path: Path) -> tuple[list[str], list[str], str, list[str]]:
 
 
 @cache
-def build_example(name: str, group: str = "Experiments") -> BuiltExample:
-    """Build experiments and resolved parameter values for one shipped example."""
+def build_example(
+    name: str,
+    group: str = "Experiments",
+    script: str = "run.sh",
+    root: Path = EXAMPLES,
+) -> BuiltExample:
+    """Build experiments and resolved parameter values for one example.
+
+    ``root`` is ``EXAMPLES`` (shipped) or ``SYNTHETIC`` (``group`` ignored).
+    """
     ensure_plugins_registered()
-    example = EXAMPLES / group / name
-    experiments_globs, parameter_globs, model, include = _parse_run_sh(
-        example / "run.sh"
+    example = root / name if root == SYNTHETIC else root / group / name
+    experiments_globs, parameter_globs, model, include = parse_run_script(
+        example / script
     )
     cwd = Path.cwd()
     os.chdir(example)
     try:
         exp_files = sorted({Path(p) for e in experiments_globs for p in glob.glob(e)})
         par_files = sorted({Path(p) for e in parameter_globs for p in glob.glob(e)})
-        selection = Selection(include=include or None, exclude=None)
+        selection = Selection(
+            include=[SpinSystem.from_name(i) for i in include] or None, exclude=None
+        )
         with contextlib.redirect_stdout(io.StringIO()):
             session = AnalysisSession()
             session.set_model(model)
@@ -110,3 +124,44 @@ def build_example(name: str, group: str = "Experiments") -> BuiltExample:
     finally:
         os.chdir(cwd)
     return BuiltExample(name, model, experiments, parameterization, frame, values)
+
+
+def example_runs() -> list[tuple[str, str, str]]:
+    """``(group, name, script)`` for every shipped example run script.
+
+    An example directory runs ``run.sh``; a directory without one (e.g.
+    ``DCEST_15N_3States``) runs each of its ``run*.sh`` variants.
+    """
+    runs = []
+    for directory in sorted(p for p in EXAMPLES.glob("*/*") if p.is_dir()):
+        scripts = (
+            [directory / "run.sh"]
+            if (directory / "run.sh").exists()
+            else sorted(directory.glob("run*.sh"))
+        )
+        runs += [(directory.parent.name, directory.name, s.name) for s in scripts]
+    return runs
+
+
+def synthetic_examples() -> list[str]:
+    """Synthetic mini-examples for experiment types without a shipped example."""
+    return sorted(p.parent.name for p in SYNTHETIC.glob("*/run.sh"))
+
+
+def all_cases() -> list[str]:
+    """Test ids: ``Experiments/X``, ``Combinations/X[/script]``, ``synthetic/X``."""
+    cases = []
+    for group, name, script in example_runs():
+        stem = "" if script == "run.sh" else f"/{Path(script).stem}"
+        cases.append(f"{group}/{name}{stem}")
+    cases += [f"synthetic/{name}" for name in synthetic_examples()]
+    return cases
+
+
+def build_case(case: str) -> BuiltExample:
+    """Build the example named by an :func:`all_cases` id."""
+    parts = case.split("/")
+    if parts[0] == "synthetic":
+        return build_example(parts[1], root=SYNTHETIC)
+    script = f"{parts[2]}.sh" if len(parts) > 2 else "run.sh"
+    return build_example(parts[1], parts[0], script)

@@ -1,0 +1,13 @@
+[experiment]
+name = "noesyfpgpph19"
+
+[conditions]
+h_larmor_frq = 600.0
+
+[data]
+path = "../Data/"
+error = "file"
+[data.profiles]
+13N = "13N.out"
+43N = "43N.out"
+55N = "55N.out"

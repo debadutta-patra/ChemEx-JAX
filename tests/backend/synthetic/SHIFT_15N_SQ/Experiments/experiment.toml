@@ -1,0 +1,11 @@
+[experiment]
+name = "shift_15n_sq"
+
+[conditions]
+h_larmor_frq = 499.684
+
+[data]
+path = "../Data/shifts.txt"
+
+
+
