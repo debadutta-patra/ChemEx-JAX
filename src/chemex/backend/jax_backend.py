@@ -43,8 +43,9 @@ DEGENERACY_RTOL = 1e-9
 
 # Padé-13 backward-error bound for float64 (Higham 2005, table 2.3).
 THETA_13 = 5.371920351148152
-# Upper bound on squarings (JAX's default): |A|_1 <= 2**16 * THETA_13 ≈ 3.5e5.
-MAX_SQUARINGS = 16
+# Upper bound on squarings: |A|_1 <= 2**20 * THETA_13 ≈ 5.6e6 (JAX defaults to
+# 16, i.e. 3.5e5; the largest shipped example, COSCEST_1HN_IP_AP, needs 1.3e4).
+MAX_SQUARINGS = 20
 
 
 def expm(a: jax.Array) -> jax.Array:
