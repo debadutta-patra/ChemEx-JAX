@@ -1,3 +1,6 @@
+# Modified in the ChemEx-JAX fork (GPL-3.0-or-later): parameter-dependent
+# magnetization is accumulated out of place so traced populations work.
+
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
@@ -46,8 +49,12 @@ def build_equilibrium_magnetization(
     magnetization = _zero_magnetization(basis)
     for state, (name, nucleus) in product(basis.model.states, basis.nuclei.items()):
         scale = par_values.get(f"p{state}", 0.0) * XI_RATIO.get(nucleus, 1.0)
-        magnetization += basis.vectors.get(f"{name}e_{state}", 0.0) * scale
-        magnetization += basis.vectors.get(f"{name}z_{state}", 0.0) * scale
+        magnetization = magnetization + (
+            basis.vectors.get(f"{name}e_{state}", 0.0) * scale
+        )
+        magnetization = magnetization + (
+            basis.vectors.get(f"{name}z_{state}", 0.0) * scale
+        )
     return magnetization
 
 
@@ -70,7 +77,7 @@ def build_start_magnetization(
             if component.startswith(term.strip("+-")):
                 sign = -1.0 if term.startswith("-") else 1.0
                 population = par_values.get(f"p{state}", 0.0)
-                magnetization += sign * population * ratio * vector
+                magnetization = magnetization + sign * population * ratio * vector
 
     return magnetization
 

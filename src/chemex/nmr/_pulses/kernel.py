@@ -1,5 +1,9 @@
+# Modified in the ChemEx-JAX fork (GPL-3.0-or-later): propagators and phase
+# stacking go through the engine's array backend.
+
 from __future__ import annotations
 
+import operator
 from collections.abc import Iterable, Sequence
 from functools import reduce
 from typing import TYPE_CHECKING
@@ -7,7 +11,6 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from chemex.nmr._pulses.propagators import (
-    calculate_propagators,
     get_phases,
     make_perfect90,
     make_perfect180,
@@ -30,7 +33,9 @@ class PulseKernel:
 
     def add_phases(self, propagator: Array, spin: str = "i") -> Array:
         phases = self._phases[spin]
-        return np.array([phases[i] @ propagator @ phases[-i] for i in range(4)])
+        return self._engine.backend.stack(
+            [phases[i] @ propagator @ phases[-i] for i in range(4)]
+        )
 
     def pulse_generation(self, spin: str) -> tuple[int, int]:
         return self._engine.pulse_generation(spin)
@@ -47,7 +52,7 @@ class PulseKernel:
         return scale * np.cos(rad) * l_x + scale * np.sin(rad) * l_y
 
     def delays(self, times: float | Iterable[float]) -> Array:
-        return calculate_propagators(self._engine.l_free, times)
+        return self._engine.backend.propagators(self._engine.l_free, times)
 
     def pulse_i(
         self,
@@ -62,7 +67,7 @@ class PulseKernel:
             phase,
             scale,
         )
-        return calculate_propagators(liouv, times, dephasing=dephased)
+        return self._engine.backend.propagators(liouv, times, dephasing=dephased)
 
     def pulse_s(
         self,
@@ -76,7 +81,7 @@ class PulseKernel:
             phase,
             scale,
         )
-        return calculate_propagators(liouv, times)
+        return self._engine.backend.propagators(liouv, times)
 
     def pulse_is(
         self,
@@ -94,7 +99,7 @@ class PulseKernel:
                 self._engine.l_b1x_s, self._engine.l_b1y_s, phase_s
             )
         )
-        return calculate_propagators(liouv, times, dephasing=dephased)
+        return self._engine.backend.propagators(liouv, times, dephasing=dephased)
 
     def shaped_pulse_i(
         self,
@@ -107,5 +112,5 @@ class PulseKernel:
         pulses = {
             (amp, ph): self.pulse_i(time, ph, scale=amp) for amp, ph in set(pairs)
         }
-        base = reduce(np.matmul, (pulses[pair] for pair in reversed(pairs)))
+        base = reduce(operator.matmul, (pulses[pair] for pair in reversed(pairs)))
         return self.add_phases(base, "i")

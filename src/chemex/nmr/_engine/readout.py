@@ -1,11 +1,15 @@
+# Modified in the ChemEx-JAX fork (GPL-3.0-or-later): detection is delegated
+# to the engine's array backend.
+
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import Any
 
 import numpy as np
 
+from chemex.backend import NUMPY_BACKEND, Backend
 from chemex.nmr._engine.detection import build_detection_vector
-from chemex.nmr._engine.magnetization import detect_signal
 from chemex.typing import Array
 
 
@@ -27,5 +31,10 @@ class LiouvillianReadout:
         self._detection = value
         self._detect_vector = detect_vector
 
-    def detect(self, magnetization: Array, weights: Array) -> float:
-        return detect_signal(self._detect_vector, magnetization, weights)
+    def detect(
+        self,
+        magnetization: Array,
+        weights: Array,
+        backend: Backend = NUMPY_BACKEND,
+    ) -> Any:
+        return backend.detect(self._detect_vector, magnetization, weights)

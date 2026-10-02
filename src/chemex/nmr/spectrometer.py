@@ -1,12 +1,16 @@
+# Modified in the ChemEx-JAX fork (GPL-3.0-or-later): exposes the evaluation
+# backend (`backend`, `xp`, `with_backend`).
+
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
 from copy import deepcopy
-from types import MappingProxyType
+from types import MappingProxyType, ModuleType
 from typing import Self, cast
 
 import numpy as np
 
+from chemex.backend import Backend
 from chemex.configuration.conditions import Conditions
 from chemex.nmr._engine.analysis import SpectrometerAnalysis
 from chemex.nmr._engine.engine import ISLiouvillianEngine
@@ -151,6 +155,26 @@ class Spectrometer:
 
     def keep(self, magnetization: Array, components: Iterable[str]) -> Array:
         return self._engine.keep(magnetization, components)
+
+    @property
+    def backend(self) -> Backend:
+        """Array backend of the evaluation path (NumPy unless copied)."""
+        return self._engine.backend
+
+    @property
+    def xp(self) -> ModuleType:
+        """Array namespace of the evaluation backend (``numpy`` by default)."""
+        return self._engine.xp
+
+    def with_backend(self, backend: Backend) -> Self:
+        """Return a private deep copy that evaluates with ``backend``.
+
+        The receiver is never modified, so shared NumPy spectrometers stay
+        thread-safe and no traced value can reach their pulse caches.
+        """
+        spectrometer = deepcopy(self)
+        spectrometer._engine.backend = backend
+        return spectrometer
 
     def update(self, par_values: dict[str, float]) -> None:
         self._engine.update(par_values)

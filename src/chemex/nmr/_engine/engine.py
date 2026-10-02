@@ -1,11 +1,16 @@
 """Internal IS Liouvillian engine and matrix assembly."""
 
+# Modified in the ChemEx-JAX fork (GPL-3.0-or-later): the engine carries an
+# array backend (NumPy by default) used on the evaluation path.
+
 from __future__ import annotations
 
 from collections.abc import Iterable
+from types import ModuleType
 
 import numpy as np
 
+from chemex.backend import NUMPY_BACKEND, Backend
 from chemex.configuration.conditions import Conditions
 from chemex.models.model import ModelSpec
 from chemex.nmr._engine.effective_field import (
@@ -52,6 +57,7 @@ class ISLiouvillianEngine:
         self.state = ISLiouvillianState()
         self._matrices = basis.copy_matrices()
         self.size = len(self.model.states) * len(basis)
+        self._backend: Backend = NUMPY_BACKEND
         self._matrix_dtype = np.result_type(
             *(matrix.dtype for matrix in self._matrices.values()),
             np.float64,
@@ -114,6 +120,22 @@ class ISLiouvillianEngine:
         factor: float = 1.0,
     ) -> Array:
         return self._matrix_or_zero(name) * (factor * value)
+
+    @property
+    def backend(self) -> Backend:
+        """Array backend used on the evaluation path (NumPy by default)."""
+        return self._backend
+
+    @backend.setter
+    def backend(self, value: Backend) -> None:
+        self._backend = value
+        # Cached pulses were built with the previous backend: mark them stale.
+        self._free_generation += 1
+
+    @property
+    def xp(self) -> ModuleType:
+        """Array namespace of the evaluation backend."""
+        return self._backend.xp
 
     @property
     def par_values(self) -> dict[str, float]:
@@ -319,7 +341,7 @@ class ISLiouvillianEngine:
         self._build_base_liouvillian()
 
     def detect(self, magnetization: Array) -> float:
-        return self._readout.detect(magnetization, self.weights)
+        return self._readout.detect(magnetization, self.weights, self._backend)
 
     def tilt_mag_along_weff_i(
         self, magnetization: Array, *, back: bool = False

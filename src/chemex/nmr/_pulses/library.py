@@ -1,3 +1,6 @@
+# Modified in the ChemEx-JAX fork (GPL-3.0-or-later): phase reorderings use
+# index arrays instead of Python lists.
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -6,6 +9,10 @@ import numpy as np
 
 from chemex.nmr._pulses.kernel import PulseKernel
 from chemex.typing import Array
+
+# Phase-cycle reorderings as index arrays (JAX rejects Python-list indexing).
+_PHASES_3012 = np.array([3, 0, 1, 2])
+_PHASES_1230 = np.array([1, 2, 3, 0])
 
 
 @dataclass(slots=True)
@@ -85,19 +92,19 @@ class PulseLibrary:
 
     @property
     def p9018090_i_1(self) -> Array:
-        return self.p90_i[[3, 0, 1, 2]] @ self.p180_i @ self.p90_i[[3, 0, 1, 2]]
+        return self.p90_i[_PHASES_3012] @ self.p180_i @ self.p90_i[_PHASES_3012]
 
     @property
     def p9018090_i_2(self) -> Array:
-        return self.p90_i[[1, 2, 3, 0]] @ self.p180_i @ self.p90_i[[1, 2, 3, 0]]
+        return self.p90_i[_PHASES_1230] @ self.p180_i @ self.p90_i[_PHASES_1230]
 
     @property
     def p9024090_i_1(self) -> Array:
-        return self.p90_i[[3, 0, 1, 2]] @ self.p240_i @ self.p90_i[[3, 0, 1, 2]]
+        return self.p90_i[_PHASES_3012] @ self.p240_i @ self.p90_i[_PHASES_3012]
 
     @property
     def p9024090_i_2(self) -> Array:
-        return self.p90_i[[1, 2, 3, 0]] @ self.p240_i @ self.p90_i[[1, 2, 3, 0]]
+        return self.p90_i[_PHASES_1230] @ self.p240_i @ self.p90_i[_PHASES_1230]
 
     def _ensure_base_pulses_s(self) -> None:
         generation = self._kernel.pulse_generation("s")
