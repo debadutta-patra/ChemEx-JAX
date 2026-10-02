@@ -354,11 +354,13 @@ class ISLiouvillianEngine:
             ppm_i=self.ppm_i,
             carrier_i=self.carrier_i,
             offset_i=self.offset_i,
+            xp=self.xp,
         )
         return tilt_magnetization_along_i_effective_field(
             magnetization,
             tilts,
             back=back,
+            xp=self.xp,
         )
 
     def get_equilibrium(self) -> Array:

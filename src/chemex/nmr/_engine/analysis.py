@@ -1,3 +1,6 @@
+# Modified in the ChemEx-JAX fork (GPL-3.0-or-later): eigenvalue analysis
+# uses the engine's array namespace.
+
 from __future__ import annotations
 
 import numpy as np
@@ -22,7 +25,7 @@ class SpectrometerAnalysis:
             self._engine.size,
             purpose="Shift eigenvalue calculation",
         )
-        return np.linalg.eigvals(liouv).imag
+        return self._engine.xp.linalg.eigvals(liouv).imag
 
     def calculate_r1rho(self) -> float:
         liouv = reshape_single_liouvillian(
@@ -30,7 +33,14 @@ class SpectrometerAnalysis:
             self._engine.size,
             purpose="R1rho eigenvalue calculation",
         )
-        eigenvalues = np.linalg.eigvals(liouv)
+        xp = self._engine.xp
+        eigenvalues = xp.linalg.eigvals(liouv)
+        if xp is not np:
+            # Traceable form: the largest nearly-real eigenvalue, NaN when
+            # there is none (the NumPy path below raises instead).
+            nearly_real = xp.abs(eigenvalues.imag) <= SMALL_VALUE
+            largest = xp.max(xp.where(nearly_real, eigenvalues.real, -xp.inf))
+            return -xp.where(xp.any(nearly_real), largest, xp.nan)
         real_eigenvalues = eigenvalues[
             np.isclose(eigenvalues.imag, 0.0, atol=SMALL_VALUE)
         ].real
