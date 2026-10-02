@@ -330,3 +330,46 @@ Triage uses the five default canonical labels. See `docs/agents/triage-labels.md
 ### Domain docs
 
 Domain documentation uses a single-context layout. See `docs/agents/domain.md`.
+
+## ChemEx-JAX fork (fork-only section)
+
+This repository is a GPL-3.0-or-later fork of ChemEx that makes the simulation
+path backend-agnostic: NumPy (default, byte-identical to upstream) and an
+optional JAX backend (float64, `jit`/`vmap`/`grad`-compatible). Design,
+inventory, and status live in `JAX_PORT_NOTES.md`; read it first.
+
+Hard rules (in addition to everything above):
+
+- The NumPy backend must not change numerically. After every change, golden
+  outputs must stay byte-identical:
+  `uv run python tests/backend/golden_outputs.py compare` (never rerun
+  `generate` except on the recorded base commit). Stop and report any
+  difference; never paper over it.
+- All upstream tests pass with unchanged tolerances. Never loosen a tolerance
+  or skip a test without the maintainer's approval.
+- No runtime monkey-patching. The backend is chosen explicitly (engine /
+  spectrometer attribute, private per-trace spectrometer copies). No
+  module-global switches; multi-worker use must stay thread-safe.
+- JAX stays optional: `import chemex` and the CLI must work without it. JAX
+  code lives in `src/chemex/backend/jax_backend.py` and `src/chemex/jax/`.
+- JAX backend is float64 only (`jax_enable_x64`); reject float32 inputs.
+- No scientific behaviour changes: CLI, TOML, defaults, parameter names,
+  models and optimizers are untouched. Fitting stays on NumPy/SciPy.
+- Keep diffs upstream-friendly: add a backend/`xp` argument or a neutral
+  operator rather than rewriting; isolate JAX code in new modules.
+- Keep copyright notices; changed upstream files carry a short
+  "Modified in the ChemEx-JAX fork" comment.
+- Ask before deleting/substantially rewriting an upstream module, changing a
+  public signature, adding a dependency, or accepting any numerical
+  difference on the NumPy path.
+- Small commits on `jax-backend`; stop and report at the end of each phase.
+
+Test commands:
+
+```sh
+uv run pytest -q -n 8                                     # full upstream suite
+uv run python tests/backend/golden_outputs.py compare     # NumPy byte-identity
+uv run --with "jax>=0.11" pytest -q -m jax tests/backend  # JAX parity (until the extra exists)
+```
+
+Phase status: Phase 0 (orient and baseline) complete — see `JAX_PORT_NOTES.md`.
