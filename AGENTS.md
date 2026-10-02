@@ -372,5 +372,5 @@ uv run python tests/backend/golden_outputs.py compare     # NumPy byte-identity
 uv run --with "jax>=0.11" pytest -q -n 10 -m jax tests/backend  # JAX parity (until the extra exists; ~30-60 min)
 ```
 
-Phase status: Phase 0 (baseline), Phase 1 (NMR engine) and Phase 2 (experiment
-catalog) complete — see `JAX_PORT_NOTES.md`.
+Phase status: Phases 0-3 complete (baseline, NMR engine, experiment catalog,
+constraint program and scientific-function twins) — see `JAX_PORT_NOTES.md`.

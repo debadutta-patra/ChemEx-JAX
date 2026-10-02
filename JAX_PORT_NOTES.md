@@ -241,6 +241,9 @@ keys, `np.take/np.flip/np.arange/np.floor/np.unique` on phase indices,
 
 ### 5.4 Scientific functions (`ScientificFunctionBinder.for_model`)
 
+> Phase 3: every function below now has a JAX twin — the authoritative
+> coverage table (function id → implementation → twin → models) is in §6.10.
+
 `for_model` binds `rate_functions | user_function_registry.get(model)` plus
 `max`. Function ids per model (enumerated at runtime with all plugins
 registered; twin coverage is tracked here from Phase 3 on):
@@ -579,6 +582,142 @@ was restricted to a row subset (CEST_15N_CW gradients: 55 min → 6 min); the
 and in 60 stress runs at 10-way concurrency (30 on `d0ba6e34`, 30 on this
 branch). The test synchronises 4 replicate threads with 5 s wall-clock waits;
 the resampling/threading code is untouched by the port.
+
+## 6.10 Phase 3 — constraint program and scientific-function twins (done)
+
+**Evaluator.** `src/chemex/parameters/program_evaluation.py` (no JAX import):
+`evaluate_program(parameterization, independent, backend, targets=None)`
+walks `ActiveParameterization.ordered_constraints` — a new read-only public
+accessor for `_ordered_constraints` — with the exact node semantics of
+`_resolve_values`, including the `-0.0 → +0.0` normalisation (applied as
+`x + 0.0`, derivative 1) to independent inputs and constraint results.
+On the NumPy backend it is **bit-identical to `resolve()` on all 46 cases**.
+`targets=` restricts evaluation to the dependency closure of a profile's
+parameters (`required_constraints`, `independent_dependencies`); DCEST_15N_HD_EXCH
+has 924 constraints, one profile needs a handful.
+
+**Domain checks.** Never evaluated on traced values, never dropped:
+`validate_concrete(parameterization, frame, updates)` runs ChemEx's own
+checked `resolve` on concrete values (tested: a 3st point with PB + PC > 1
+evaluates to finite numbers under tracing and is rejected by
+`validate_concrete`). Phase 4's compiled functions call it on every concrete
+input they evaluate.
+
+**Twins** (`src/chemex/backend/jax_scientific.py`, `jax_binding.py`,
+`jax_oligomerization.py`; imported only by the JAX backend). Keyed by the
+unwrapped implementation (`inspect.unwrap`), because function ids like
+`rates`/`populations` name different functions per model; `lru_cache`
+wrappers are bypassed (no hashing of tracers, no cache writes). A function
+without a twin raises `MissingTwinError`. Design rules:
+
+* same formulas and evaluation order as ChemEx (log domain where ChemEx is);
+* exact-zero branches (structurally absent pathways, `koff == 0`, `K == 0`)
+  via `jnp.where` with safe operands on the branch not taken (no NaN leaks
+  into values or derivatives);
+* branches on condition totals only (`l_total == 0`, equal pools,
+  `p <= l`, `p_total == 0`) stay Python branches when the totals are concrete
+  numbers (they are expression literals), exactly as upstream;
+* `math.fsum` mass-balance corrections are kept (applied to the `argmax`
+  entry as upstream), with an ordinary sum (ulp-level differences);
+* no `min`/`max` on traced operands where ChemEx's result is smooth through a
+  tie: `pair_rates` selects the operand explicitly (a `jnp.minimum` version
+  gave a 50/50-split, wrong derivative at `p_i == p_j`; caught by the
+  program-Jacobian test). Remaining `max` uses are shift/scale factors that
+  cancel mathematically (`pop_*st` scale, log-sum-exp shifts);
+* oligomerization: `brentq` → Newton on the log mass balance
+  `g(y) = logsumexp(y, log n_k + c_k + n_k y)` from `y = 0` (convex,
+  increasing, `g(0) ≥ 0` ⇒ monotone quadratic convergence) in a
+  `lax.while_loop`, wrapped in a `jax.custom_jvp` with the implicit-function
+  tangent `dy = -(∂g/∂c · dc)/(∂g/∂y)`; no new dependency;
+* the model-free rate classes (`nmr.rates.Rate*`) are called directly: they
+  are plain arithmetic in `tauc`/`s2`/`khh`, and `h_frq` is an expression
+  literal so their NumPy constant arrays stay concrete.
+
+| function_id | Implementation | JAX twin | Models |
+| --- | --- | --- | --- |
+| `max` | builtin | `jax_scientific._maximum` (`jnp.maximum`) | all |
+| `ch`, `ch_d`, `cn`, `cn_d`, `hc`, `hc_d`, `hn`, `hn_d`, `nh`, `nh_d` | `nmr.rates.Rate*` | called directly (namespace-generic; `h_frq` is a literal) | all (`.mf`) |
+| `pop_2st` | `constraints.pop_2st` | `jax_scientific.pop_2st` | 2st_eyring, 2st_hd, 2st_monomer_dimer, 2st_monomer_tetramer, 2st_monomer_trimer |
+| `pop_3st` | `constraints.pop_3st` | `jax_scientific.pop_3st` | 3st_binding_partner_2st, 3st_double_binding, 3st_eyring, 3st_eyring_fork, 3st_eyring_linear, 3st_monomer_dimer_tetramer, 3st_monomer_dimer_trimer |
+| `pop_4st` | `constraints.pop_4st` | `jax_scientific.pop_4st` | 4st_eyring |
+| `eyring_rate` | `kinetic._eyring.calculate_rate_component` | `jax_scientific.eyring_rate` | 2st_eyring, 3st_eyring, 3st_eyring_fork, 3st_eyring_linear, 4st_eyring |
+| `calc_conc` | `kinetic.settings_2st_binding.calculate_concentrations` | `jax_binding.b2_concentrations` | 2st_binding |
+| `populations` | `kinetic.settings_2st_binding.calculate_populations` | `jax_binding.b2_populations` | 2st_binding |
+| `rates` | `kinetic.settings_2st_binding.calculate_rates` | `jax_binding.b2_rates` | 2st_binding |
+| `kij_2st_eyring` | `kinetic.settings_2st_eyring.calculate_kij_2st_eyring` | `jax_scientific.kij_2st_eyring` | 2st_eyring |
+| `pop_2st_eyring` | `kinetic.settings_2st_eyring.calculate_populations_2st_eyring` | `jax_scientific.populations_2st_eyring` | 2st_eyring |
+| `concentrations` | `kinetic.settings_2st_monomer_dimer.calculate_concentrations` | `functools._concentrations` | 2st_monomer_dimer |
+| `populations` | `kinetic.settings_2st_monomer_dimer.calculate_populations` | `functools._populations` | 2st_monomer_dimer |
+| `rates` | `kinetic.settings_2st_monomer_dimer.calculate_rates` | `jax_oligomerization.rates` | 2st_monomer_dimer |
+| `concentrations` | `kinetic.settings_2st_monomer_tetramer.calculate_concentrations` | `functools._concentrations` | 2st_monomer_tetramer |
+| `populations` | `kinetic.settings_2st_monomer_tetramer.calculate_populations` | `functools._populations` | 2st_monomer_tetramer |
+| `rates` | `kinetic.settings_2st_monomer_tetramer.calculate_rates` | `jax_oligomerization.rates` | 2st_monomer_tetramer |
+| `concentrations` | `kinetic.settings_2st_monomer_trimer.calculate_concentrations` | `functools._concentrations` | 2st_monomer_trimer |
+| `populations` | `kinetic.settings_2st_monomer_trimer.calculate_populations` | `functools._populations` | 2st_monomer_trimer |
+| `rates` | `kinetic.settings_2st_monomer_trimer.calculate_rates` | `jax_oligomerization.rates` | 2st_monomer_trimer |
+| `calc_conc` | `kinetic.settings_3st_binding_2st_partner.calculate_concentrations` | `jax_binding.b3p_concentrations` | 3st_binding_partner_2st |
+| `populations` | `kinetic.settings_3st_binding_2st_partner.calculate_populations` | `jax_binding.b3p_populations` | 3st_binding_partner_2st |
+| `rates` | `kinetic.settings_3st_binding_2st_partner.calculate_rates` | `jax_binding.b3p_rates` | 3st_binding_partner_2st |
+| `binding_rates` | `kinetic.settings_3st_binding_cs.calculate_binding_rates` | `jax_binding.cs_binding_rates` | 3st_binding_cs |
+| `equilibrium` | `kinetic.settings_3st_binding_cs.calculate_concentrations` | `jax_binding.cs_concentrations` | 3st_binding_cs |
+| `conformational_rates` | `kinetic.settings_3st_binding_cs.calculate_conformational_rates` | `jax_binding.cs_conformational_rates` | 3st_binding_cs |
+| `intrinsic_values` | `kinetic.settings_3st_binding_cs.calculate_intrinsic_values` | `jax_binding.cs_intrinsic_values` | 3st_binding_cs |
+| `kon_values` | `kinetic.settings_3st_binding_cs.calculate_kon_values` | `jax_binding.cs_kon_values` | 3st_binding_cs |
+| `populations` | `kinetic.settings_3st_binding_cs.calculate_populations` | `jax_binding.cs_populations` | 3st_binding_cs |
+| `binding_rates` | `kinetic.settings_3st_binding_if.calculate_binding_rates` | `jax_binding.if_binding_rates` | 3st_binding_if |
+| `equilibrium` | `kinetic.settings_3st_binding_if.calculate_concentrations` | `jax_binding.if_concentrations` | 3st_binding_if |
+| `conformational_rates` | `kinetic.settings_3st_binding_if.calculate_conformational_rates` | `jax_binding.if_conformational_rates` | 3st_binding_if |
+| `intrinsic_values` | `kinetic.settings_3st_binding_if.calculate_intrinsic_values` | `jax_binding.if_intrinsic_values` | 3st_binding_if |
+| `kon_values` | `kinetic.settings_3st_binding_if.calculate_kon_values` | `jax_binding.if_kon_values` | 3st_binding_if |
+| `populations` | `kinetic.settings_3st_binding_if.calculate_populations` | `jax_binding.if_populations` | 3st_binding_if |
+| `calc_conc` | `kinetic.settings_3st_double_binding.calculate_concentrations` | `jax_binding.b3d_concentrations` | 3st_double_binding |
+| `populations` | `kinetic.settings_3st_double_binding.calculate_populations` | `jax_binding.b3d_populations` | 3st_double_binding |
+| `rates` | `kinetic.settings_3st_double_binding.calculate_rates` | `jax_binding.b3d_rates` | 3st_double_binding |
+| `kij_3st_eyring_fork` | `kinetic.settings_3st_eyring.calculate_kij_3st_eyring_fork` | `jax_scientific.kij_3st_eyring_fork` | 3st_eyring_fork |
+| `kij_3st_eyring` | `kinetic.settings_3st_eyring.calculate_kij_3st_eyring_linear` | `jax_scientific.kij_3st_eyring_linear` | 3st_eyring, 3st_eyring_linear |
+| `pop_3st_eyring` | `kinetic.settings_3st_eyring.calculate_populations_3st_eyring` | `jax_scientific.populations_3st_eyring` | 3st_eyring, 3st_eyring_fork, 3st_eyring_linear |
+| `concentrations` | `kinetic.settings_3st_monomer_dimer_tetramer.calculate_concentrations` | `functools._concentrations` | 3st_monomer_dimer_tetramer |
+| `populations` | `kinetic.settings_3st_monomer_dimer_tetramer.calculate_populations` | `functools._populations` | 3st_monomer_dimer_tetramer |
+| `rates` | `kinetic.settings_3st_monomer_dimer_tetramer.calculate_rates` | `jax_oligomerization.dimer_tetramer_rates` | 3st_monomer_dimer_tetramer |
+| `concetrations` | `kinetic.settings_3st_monomer_dimer_trimer.calculate_concentrations` | `functools._concentrations` | 3st_monomer_dimer_trimer |
+| `populations` | `kinetic.settings_3st_monomer_dimer_trimer.calculate_populations` | `functools._populations` | 3st_monomer_dimer_trimer |
+| `rates` | `kinetic.settings_3st_monomer_dimer_trimer.calculate_rates` | `jax_oligomerization.dimer_trimer_rates` | 3st_monomer_dimer_trimer |
+| `calc_conc` | `kinetic.settings_4st_binding_2st_partner.calculate_concentrations` | `jax_binding.b4p_concentrations` | 4st_binding_partner_2st |
+| `populations` | `kinetic.settings_4st_binding_2st_partner.calculate_populations` | `jax_binding.b4p_populations` | 4st_binding_partner_2st |
+| `rates` | `kinetic.settings_4st_binding_2st_partner.calculate_rates` | `jax_binding.b4p_rates` | 4st_binding_partner_2st |
+| `concentrations` | `kinetic.settings_4st_binding_3_bound_states.calculate_concentrations` | `jax_binding.b43_concentrations` | 4st_binding_3_bound_states |
+| `populations` | `kinetic.settings_4st_binding_3_bound_states.calculate_populations` | `jax_binding.b43_populations` | 4st_binding_3_bound_states |
+| `rates` | `kinetic.settings_4st_binding_3_bound_states.calculate_rates` | `jax_binding.b43_rates` | 4st_binding_3_bound_states |
+| `kij_4st_eyring` | `kinetic.settings_4st_eyring.calculate_kij_4st_eyring` | `jax_scientific.kij_4st_eyring` | 4st_eyring |
+| `pop_4st_eyring` | `kinetic.settings_4st_eyring.calculate_populations_4st_eyring` | `jax_scientific.populations_4st_eyring` | 4st_eyring |
+| `pair_rates` | `kinetic.settings_nst.calculate_pair_rates` | `jax_scientific.pair_rates` | 3st, 3st_fork, 3st_linear, 3st_triangle, 4st, 4st_fork, 4st_linear, 5st, 5st_fork, 5st_linear, 6st, 6st_fork, 6st_linear |
+| `population_complement` | `kinetic.settings_nst.calculate_population_complement` | `jax_scientific.population_complement` | 3st, 3st_fork, 3st_linear, 3st_triangle, 4st, 4st_fork, 4st_linear, 5st, 5st_fork, 5st_linear, 6st, 6st_fork, 6st_linear |
+
+Missing twins: 0
+
+**Tests** (all pass):
+
+| Test module | What | Result |
+| --- | --- | --- |
+| `test_program_evaluation.py` | NumPy evaluator vs `resolve` (46 cases, bitwise); targets; `validate_concrete`; missing twin; JAX-then-NumPy with cached model functions (5 models) | 54 passed |
+| `test_jax_kinetics.py` | 34 models × {plain, .mf, .rs, .tc} = 136 cases: resolved values (`jit`) ≤ 1e-10 per value; program `jacfwd` vs Richardson FD of `resolve` ≤ 1e-5; profile from independent values ≤ 1e-9; `jacfwd` vs `jacrev` ≤ 1e-10 | 408 passed; worst resolved-value error 2.7e-15 (68/136 bit-identical) |
+| `test_jax_twins.py` | binding + oligomer twins on deterministic argument grids (structural zeros, equal pools, KD 1e-9 … 1): values ≤ 1e-10; gradients vs NumPy FD with an explicit FD roundoff budget; exact oracles (closed-form 2st binding, 90-digit mpmath mass balances for 4 oligomer models × 12 points) ≤ 1e-10; Eyring rate/population gradients vs ChemEx's analytic partials ≤ 1e-10/1e-9; pop_2st/3st/4st and pair-rate edge cases | 140 passed |
+
+Kinetic-model template: `tests/backend/synthetic/MODELS` (CPMG 15N in-phase,
+three residues, `temperature = 25`, `p_total = 1.5e-3`, `l_total = 1.0e-3`,
+`d2o = 0.1`; model chosen per case).
+
+As in Phase 2, float64 finite differences of the NumPy functions cannot
+certify derivatives at extreme corners (e.g. KD = 1e-9 with micromolar
+ligand: `p_free` ≈ 1e-3 with a derivative of 1e-3 relative to KD yields FD
+errors of 1e-4); against the exact closed-form derivative the twin is
+accurate to 1.7e-15 there.
+
+**x64 pitfall.** `jax_enable_x64` only affects arrays created after it is
+set; importing the JAX backend lazily *inside* a traced function traced in
+float32 (XLA rejected the f64 input). Tests import the backend first (autouse
+fixture); Phase 4's `chemex.jax` will enable x64 at import time and check
+input dtypes.
 
 ## 7. Decisions (maintainer, 2026-10-02)
 
