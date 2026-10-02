@@ -719,6 +719,158 @@ float32 (XLA rejected the f64 input). Tests import the backend first (autouse
 fixture); Phase 4's `chemex.jax` will enable x64 at import time and check
 input dtypes.
 
+## 6.11 Phase 4 — public `chemex.jax` API
+
+**API** (`src/chemex/jax/`, optional; importing it enables float64):
+
+* `compile_profile(profile, parameterization, free_ids, *, frame)` →
+  `CompiledProfile`: `f(x) -> unscaled profile`.
+* `compile_residuals(experiments, parameterization, free_ids, *, frame)` →
+  `CompiledResiduals`: `r(x)` = ChemEx's native weighted residuals, plus
+  `chi2(x)`, `size`, `group_count`.
+* Both expose `x0` (free values from `frame`) and `validate(x)` (ChemEx's
+  checked resolver on concrete `x`; raises on domain errors).
+* `kernel_signature(profile)`, `KERNEL_CACHE` (`.clear()`).
+
+Deviation from the brief's signatures: a keyword-only `frame`
+(`IndependentValueFrame`) is required. `ActiveParameterization` holds no
+values, and the independent parameters that are not free must be fixed at
+something; the frame is ChemEx's own lifecycle-checked value carrier.
+
+**Residual contract** (decision 2): same order (experiment, then profile,
+then retained observation), same per-profile normalisation
+`Σ(c/e)(x/e) / Σ(c/e)²` (no `+eps`; 1 for unscaled profiles), same
+`(scale·calc − exp)/err` as `evaluation/native.py`. Noise estimation
+(`error = "duplicates"`/`"scatter"`) happens at build time
+(`experiment_types.py:631`), so the compiled residuals see exactly the
+errors the native plan freezes. Masked points use safe operands so no NaN
+reaches gradients.
+
+**Shape-grouped compilation.** Profiles are grouped by `kernel_signature`:
+a hash of the pulse-sequence class and settings, metadata, local parameter
+names and the spectrometer's numeric state (basis matrices, carriers,
+offsets, B1/J distributions and their Liouvillian terms, detection vector).
+The spin-system label and the parameter values are excluded. One compiled
+`jit(vmap(kernel))` per group is cached (bounded LRU, thread-safe). This is
+also the per-residue `vmap` deferred from Phase 2. Examples:
+
+| Example | Profiles | Kernels |
+| --- | --- | --- |
+| CPMG_15N_IP | 108 | 2 (one per field) |
+| 2stBinding | 546 | 4 |
+| DCEST_15N_HD_EXCH | 462 | 3 |
+| DCEST_15N_3States (DRD runs) | 468 | 9 |
+| CEST_13C_LABEL_CN | 20 | 7 (per-carbon J multiplets) |
+
+**Residual parity, all 46 cases** (native `EvaluationEngine` vs
+`compile_residuals`, all independent parameters free): χ² relative error
+≤ 2.2e-11 (typically 1e-16 – 1e-13). `max|Δr| / max|r|` ≤ 6e-12 everywhere
+except **CEST_15N_CW: 1.1e-9**. There the unscaled calculations differ by
+≤ 4.3e-11 (float64 conditioning of the dephased, decoupled Liouvillian;
+three profiles of that example were outside Phase 2's three-profile sample),
+and the residual `(s·c − x)/e`, with scale ≈ 1.3e4 and |r| ≲ 8, amplifies
+this by `max|s·c/e| / max|r|` ≈ 30. The test therefore measures residual
+errors against the weighted-signal scale `max|s·c/e|` (≤ 1e-9; CEST_15N_CW:
+4e-11) and χ² (≤ 1e-9), and reports `max|Δr|/max|r|`. **Needs the
+maintainer's confirmation** (open question).
+
+**Fisher example** (`examples/jax/fisher_cpmg_15n_ip.py`): at ChemEx's own
+STEP1 fitted values, χ² = 434.56 (ChemEx: 434.555) and every linearised
+standard error from `F = JᵀWJ` matches ChemEx's reported uncertainty to all
+printed digits (KEX_AB 6.234 vs ±6.23429, PB 8.024e-4 vs ±8.02436e-4,
+DW_AB_15N 1.614e-2 vs ±1.61442e-2, …). The example builds every residue and
+then selects STEP1's, because duplicate-based noise is a per-experiment
+average over all profiles.
+
+**Benchmark** (`benchmarks/jax_vs_numpy.py`; exploratory, no gate; CPU,
+i7-13700H). Forward-mode Jacobians carry one tangent per parameter: a full
+Jacobian over *all* independent parameters of the CEST examples exhausted
+30 GB (it crashed the session), so part 2 differentiates a fit-step-sized
+subset and reports peak RSS:
+
+```
+# x86_64, 20 threads, Python 3.13.12, JAX 0.11.2, devices [CpuDevice(id=0)]
+
+Part 1 — one 26-point CPMG_15N_IP profile, 6 free parameters (__CS_A_1N, __DW_AB_1N, __KEX_AB, __PB, __R1_A_1N_500_0MHZ, __R2_A_1N_500_0MHZ)
+| Operation | Time | First call (compile) |
+| --- | --- | --- |
+| ChemEx NumPy forward | 0.59 ms | — |
+| JAX jit forward | 1.87 ms | 2.1 s |
+| JAX forward + full jacfwd | 7.03 ms | 8.2 s |
+| JAX vmap batch of 256, per profile | 0.231 ms | 2.3 s |
+Peak RSS after part 1: 0.9 GB
+
+Part 2 — whole-example weighted residuals, all independent parameters free
+| Example | Profiles | Kernels | Free (fwd / Jacobian) | Native residuals | JAX residuals (compile) | JAX Jacobian (compile) | Peak RSS |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| CPMG_15N_IP | 108 | 2 | 326 / 22 | 67.9 ms | 31.7 ms (4.2 s) | 280.3 ms (14.8 s) | 2.0 GB |
+| CEST_15N | 32 | 2 | 82 / 24 | 106.6 ms | 18.0 ms (3.5 s) | 71.9 ms (6.8 s) | 2.0 GB |
+| DCEST_15N | 108 | 2 | 272 / 24 | 344.0 ms | 150.5 ms (6.6 s) | 1997.5 ms (20.8 s) | 7.0 GB |
+| RELAXATION_NZ | 5 | 1 | 7 / 7 | 0.0 ms | 0.2 ms (0.9 s) | 1.2 ms (1.8 s) | 7.0 GB |
+```
+
+Notes: the native evaluator caches per frame, so its timing perturbs a
+shared parameter on every call (RELAXATION_NZ's row still hits the cache).
+Part 1's Jacobian (7 ms) is about 2× the prototype's 3.3 ms. The prototype
+differentiated `jax.scipy.linalg.expm` through JAX's `expm_frechet` rule,
+while the corrected `expm` (§6.8) is differentiated through the Padé
+approximant and the squaring scan. A `custom_jvp` via the block-triangular
+Fréchet identity is a possible optimisation.
+
+**Memory discipline.** Heavy JAX jobs run under
+`systemd-run --user --scope -p MemoryMax=… -p MemorySwapMax=0`, and the
+JAX tests clear `KERNEL_CACHE` and `jax.clear_caches()` after each test
+(autouse fixture).
+
+**Tests** (`tests/backend/test_jax_api.py`, 53 tests, all pass; 21.7 min on
+4 workers under a 20 GB cgroup cap, peak system memory 19.2 GB): residual
+parity on all 46 cases; `compile_profile` vs `calculate_unscaled` (incl.
+free-parameter subsets, `jacfwd` vs `jacrev`); 108 CPMG profiles → 2 shared
+kernels and per-profile agreement; float32 / wrong-shape / non-independent
+inputs rejected; `validate` raises ChemEx's domain errors; JAX (jit, grad,
+jacrev, vmap) then NumPy and native evaluation bit-identical, no tracer in
+spectrometers; 2 threads × 3 examples concurrently = serial results.
+
+**Memory findings (after the OOM crash).**
+
+* Peak RSS per test, measured alone: 3-state D-CEST residuals (468
+  profiles) 7.8 GB; whole-example `jacrev` (CEST_15N) 5.2 GB; COSCEST
+  residuals 4.6 GB; most others 1-2 GB.
+* Worker RSS never shrank after `jax.clear_caches()` (glibc keeps freed
+  heap): 4.4 GB stayed 4.4 GB. `gc.collect()` + `malloc_trim(0)` returns it
+  (4.4 → 0.7-2.3 GB). Public helper `chemex.jax.release_memory()` does
+  all three plus clearing the kernel cache; the test fixture calls it after
+  every JAX test, and the benchmark between examples.
+* Tests marked `memory_heavy` take an inter-process `fcntl` lock
+  (`tests/backend/conftest.py`), so only one runs at a time across xdist
+  workers under any `-n` (verified: strictly serial start/end). A
+  root-conftest `--dist loadgroup` switch did not work: xdist reads the
+  option before conftest hooks run.
+
+**Experiment-design examples** (requested during Phase 4):
+
+* `examples/jax/design_cpmg_15n_ip.py` — local optimal design over
+  candidate ncyc values (profile copy with candidate metadata, one exact
+  Jacobian + intensity-scale column, greedy selection; prior robustness via
+  `vmap`; CPMG period comparison). 26 points, residue 15N at 500 MHz:
+  example ncyc list SE(KEX) 23.8 % / SE(PB) 9.6 % → greedy 15.5 % / 4.9 %.
+* `examples/jax/next_experiment.py` — sequential design
+  `F_next = F_existing + F_candidate`: existing data via native residuals at
+  current estimates; candidate = TOML copy with B0 or B1 changed, built
+  jointly (new-field R2 parameters included, initialised from the existing
+  field), filled with ChemEx's noiseless prediction at the existing relative
+  noise. CPMG next B0 after 500 MHz: 6.2 % → 2.5 % (600), 1.4 % (800),
+  1.1 % (1200) for SE(KEX). CEST next B1 after 26 Hz: 29.6 % → 6.3 % (10 Hz,
+  best), 12.6 % (40 Hz). Sanity check: repeating 500 MHz gives ≈ √2
+  (6.2 → 4.5 %).
+
+**User documentation:** `website/docs/user_guide/jax_backend.md` ("Using the
+JAX backend": when to use it, advantages with measured numbers,
+installation, quick start, recipes, reference, costs and limits,
+differentiability). Every code snippet was run (CPMG_15N_IP, two residues);
+the Docusaurus site builds (`npm ci && npm run build`); the page renders at
+`/docs/next/user_guide/jax_backend`.
+
 ## 7. Decisions (maintainer, 2026-10-02)
 
 1. Golden comparisons exclude every `*identity` value (see §2).

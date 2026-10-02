@@ -363,14 +363,19 @@ Hard rules (in addition to everything above):
   public signature, adding a dependency, or accepting any numerical
   difference on the NumPy path.
 - Small commits on `jax-backend`; stop and report at the end of each phase.
+- Memory: JAX compilation and forward-mode Jacobians are memory-hungry (a full
+  Jacobian over every parameter of a CEST example exhausted 30 GB). Run heavy
+  JAX jobs under a cgroup cap (`systemd-run --user --scope -p MemoryMax=...`),
+  at most ~4 pytest workers, never two heavy jobs at once.
 
 Test commands:
 
 ```sh
 uv run pytest -q -n 8                                     # full upstream suite
 uv run python tests/backend/golden_outputs.py compare     # NumPy byte-identity
-uv run --with "jax>=0.11" pytest -q -n 10 -m jax tests/backend  # JAX parity (until the extra exists; ~30-60 min)
+systemd-run --user --scope -p MemoryMax=20G -p MemorySwapMax=0 \
+  uv run --with "jax>=0.11" pytest -q -n 4 -m jax tests/backend  # JAX suite (~1-2 h)
 ```
 
-Phase status: Phases 0-3 complete (baseline, NMR engine, experiment catalog,
-constraint program and scientific-function twins) — see `JAX_PORT_NOTES.md`.
+Phase status: Phases 0-4 complete (baseline, NMR engine, experiment catalog,
+constraint program and twins, public `chemex.jax` API) — see `JAX_PORT_NOTES.md`.
