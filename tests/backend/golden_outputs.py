@@ -72,14 +72,26 @@ sys.exit(main())
 
 
 def _examples(names: list[str]) -> list[Path]:
-    found = sorted(p.parent for p in EXAMPLES.glob("*/*/run.sh"))
+    """Run scripts: ``run.sh`` per example, or each ``run*.sh`` if it has none."""
+    found = []
+    for directory in sorted(p for p in EXAMPLES.glob("*/*") if p.is_dir()):
+        if (directory / "run.sh").exists():
+            found.append(directory / "run.sh")
+        else:
+            found += sorted(directory.glob("run*.sh"))
     if names:
-        found = [p for p in found if p.name in names or _key(p) in names]
+        found = [
+            p
+            for p in found
+            if p.parent.name in names or _key(p) in names or p.stem in names
+        ]
     return found
 
 
-def _key(example: Path) -> str:
-    return f"{example.parent.name}/{example.name}"
+def _key(script: Path) -> str:
+    example = script.parent
+    key = f"{example.parent.name}/{example.name}"
+    return key if script.name == "run.sh" else f"{key}/{script.stem}"
 
 
 def _shim_dir(scratch: Path) -> Path:
@@ -91,8 +103,8 @@ def _shim_dir(scratch: Path) -> Path:
     return shim_dir
 
 
-def _run(example: Path, out_root: Path, shim_dir: Path) -> tuple[str, int, str]:
-    out = out_root / _key(example)
+def _run(script: Path, out_root: Path, shim_dir: Path) -> tuple[str, int, str]:
+    out = out_root / _key(script)
     if out.exists():
         shutil.rmtree(out)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -101,15 +113,15 @@ def _run(example: Path, out_root: Path, shim_dir: Path) -> tuple[str, int, str]:
     env["CHEMEX_GOLDEN_OUT"] = str(out)
     for var in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
         env[var] = "1"
-    proc = subprocess.run(
-        ["sh", "run.sh"],  # noqa: S607
-        cwd=example,
+    proc = subprocess.run(  # noqa: S603 - repository example script
+        ["sh", script.name],  # noqa: S607
+        cwd=script.parent,
         env=env,
         capture_output=True,
         text=True,
         check=False,
     )
-    return _key(example), proc.returncode, proc.stdout[-2000:] + proc.stderr[-4000:]
+    return _key(script), proc.returncode, proc.stdout[-2000:] + proc.stderr[-4000:]
 
 
 def _blank_identities(value: object) -> object:
@@ -183,7 +195,7 @@ def main() -> None:
         return
 
     manifest = json.loads(MANIFEST.read_text())
-    names = args.names or [key.split("/", 1)[1] for key in manifest]
+    names = args.names or list(manifest)
     check_root = ROOT / ".golden-check"
     actual = (
         _rehash_all(names, check_root)
