@@ -340,7 +340,76 @@ implicit-function-theorem `jax.custom_jvp`, instead of adding `optimistix`.
 fork appends a clearly marked "ChemEx-JAX fork" section instead of replacing
 it, and `CLAUDE.md` points to `AGENTS.md`.
 
-## 7. Open questions
+## 6.8 Phase 1 — backend abstraction in the NMR engine (done)
+
+What changed:
+
+| File | Change |
+| --- | --- |
+| `src/chemex/backend/{__init__,base,numpy_backend}.py` (new) | `Backend` protocol, `get_backend`, NumPy singleton delegating verbatim (`calculate_propagators`, `numpy.linalg.matrix_power`, `np.array`, `detect_signal`); pickles/deep-copies by name; lazy `chemex.nmr` imports keep the package a leaf |
+| `src/chemex/backend/jax_backend.py` (new) | JAX kernels: float64 guard, corrected `expm` (below), Daleckii-Krein `custom_jvp` dephased propagator (ported from the prototype), backend `detect` returning a 0-d array |
+| `nmr/_engine/engine.py` | `backend`/`xp` attributes (default NumPy; setter bumps the free-evolution generation so pulse caches rebuild); `detect` passes the backend |
+| `nmr/_engine/readout.py` | `detect(..., backend=NUMPY_BACKEND)` delegates to `backend.detect` |
+| `nmr/_engine/magnetization.py` | `m += x` → `m = m + x` (same ufunc and operand order) |
+| `nmr/_pulses/kernel.py` | propagators and phase stacking via `engine.backend`; `reduce(operator.matmul, …)` |
+| `nmr/_pulses/library.py` | `p90_i[[3,0,1,2]]` → module-level index arrays |
+| `nmr/spectrometer.py` | `backend`, `xp`, `with_backend()` (private deep copy) |
+| six catalog modules | `return np.array(...)` → `spectrometer.backend.stack(...)`, `matrix_power` → `spectrometer.backend.matrix_power` |
+
+**JAX `expm` bug (found in Phase 1).** `jax.scipy.linalg.expm` (0.11.2,
+`jax/_src/scipy/linalg.py::_calc_P_Q`) uses
+`n_squarings = floor(log2(|A|_1 / theta_13))`; Higham (2005) — and JAX's own
+docstring — require `ceil`. The scaled norm can then lie in
+`[theta_13, 2 theta_13)`, outside Padé-13's accuracy bound. For the D-CEST
+free-precession delay of DCEST_15N_HD_EXCH residue 159N (6x6,
+`|A|_1 = 19.4`) JAX returns `exp(A)` with 2.1e-9 relative error against a
+40-digit mpmath reference (SciPy: 1.4e-14); the 120-fold DANTE matrix power
+turns that into a 2.2e-9 profile error, failing the 1e-9 parity criterion.
+The prototype's larger forward errors (1e-12 – 1e-9) have the same cause.
+Fix: `jax_backend.expm` scales with `ceil` itself, calls JAX's Padé step with
+`max_squarings=0` on the scaled matrix, squares with a `lax.scan`/`lax.cond`
+loop (≤ 16 squarings, as JAX), and returns NaN beyond the squaring budget
+instead of a silently wrong matrix. Tested against SciPy for norms 0 – 1e3
+(`tests/backend/test_jax_expm.py`). Worth reporting upstream to JAX.
+
+Forward parity under `jax.jit` (3 profiles spread over each example; local
+spectrometer values traced; tolerance 1e-9):
+
+| Example | Model | Profiles | Max rel. error (3 profiles) |
+| --- | --- | --- | --- |
+| CEST_13C | 2st | 16 | 1.4e-13 |
+| CPMG_15N_IP | 2st | 108 | 4.5e-14 |
+| CPMG_CHD2_1H_AP | 2st | 32 | 9.3e-14 |
+| DCEST_15N | 2st | 108 | 3.2e-14 |
+| DCEST_15N_HD_EXCH | 2st_hd | 462 | 2.9e-14 |
+| RELAXATION_HZNZ | 2st | 5 | 1.4e-15 |
+| RELAXATION_NZ | 2st | 5 | 1.2e-16 |
+
+Also tested: JAX (`jit`, `jacfwd`, `vmap`) then NumPy in one process leaves
+the NumPy profile bit-identical and the shared spectrometer untouched;
+float32 Liouvillians are rejected; `import chemex`/CLI/plugin registration
+never import JAX; backends survive deepcopy/pickle.
+
+Tooling note: until the `jax` extra exists (Phase 5), `ty check` reports the
+three unresolved `jax` imports in `jax_backend.py`; everything else is clean.
+`prototypes/` is excluded locally via `.git/info/exclude` (so `ruff check .`
+and `git status` ignore it) and from pytest via the root `conftest.py`.
+
+## 7. Decisions (maintainer, 2026-10-02)
+
+1. Golden comparisons exclude every `*identity` value (see §2).
+2. `compile_residuals` uses the **native** fit scaling
+   (`evaluation/native.py::_normalization_factor`, no `+eps`), not
+   `Data.scale`.
+3. Phase 1 also ports the six modules behind the seven "no-change" examples
+   (`cest_13c`, `cpmg_15n_ip`, `cpmg_chd2_1h_ap`, `dcest_15n`,
+   `relaxation_hznz`, `relaxation_nz`).
+4. The oligomerization root solve is hand-written (bracketed Newton +
+   implicit-function `custom_jvp`); no `optimistix` dependency.
+5. `prototypes/` is not committed (kept locally as a reference/oracle).
+
+## 8. Open questions (Phase 0, resolved above unless noted)
+
 
 1. **Phase-1 scope (§6.4).** OK to port the six modules behind the seven
    "no-change" examples in Phase 1 (`np.array` → `backend.stack`,
