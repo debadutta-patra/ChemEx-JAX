@@ -22,12 +22,17 @@ import pytest
 
 from chemex.parameters.parameterization import ParameterizationError
 from tests.backend._checks import FD_STEPS, FORWARD_RTOL, JACREV_RTOL, relative_error
-from tests.backend._examples import build_model_case, model_cases
+from tests.backend._examples import (
+    QUICK_MODELS,
+    build_model_case,
+    model_cases,
+    quick_or_full,
+)
 from tests.backend._jax_profile import make_program_function
 
 pytestmark = pytest.mark.jax
 
-MODELS = model_cases()
+MODELS = quick_or_full(model_cases(), QUICK_MODELS)
 VALUE_RTOL = 1e-10
 PROGRAM_GRADIENT_RTOL = 1e-5
 

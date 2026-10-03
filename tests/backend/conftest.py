@@ -19,6 +19,11 @@ def pytest_configure(config: pytest.Config) -> None:
     )
     config.addinivalue_line(
         "markers",
+        "jax_full: exhaustive JAX sweep (all examples/models); CI runs it on a "
+        "schedule, routine runs use -m 'not jax_full'",
+    )
+    config.addinivalue_line(
+        "markers",
         "memory_heavy: needs several GB; such tests run one at a time across "
         "xdist workers (inter-process lock)",
     )

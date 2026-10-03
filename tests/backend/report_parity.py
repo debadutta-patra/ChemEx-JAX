@@ -1,7 +1,7 @@
 # ChemEx-JAX fork addition (GPL-3.0-or-later); not part of upstream ChemEx.
 """Print the JAX-vs-NumPy coverage tables used in JAX_PORT_NOTES.md.
 
-    uv run --with 'jax>=0.11' --with mpmath python -m tests.backend.report_parity [CASE...]
+    uv run --extra jax python -m tests.backend.report_parity [CASE...]
 
 Runs the same checks as ``test_jax_parity.py`` (forward on 3 profiles,
 gradients on the first profile) and prints one Markdown row per case, then a

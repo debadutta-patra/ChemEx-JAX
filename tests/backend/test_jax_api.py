@@ -16,7 +16,12 @@ import threading
 import numpy as np
 import pytest
 
-from tests.backend._examples import all_cases, build_case, build_model_case
+from tests.backend._examples import (
+    QUICK_CASES,
+    all_cases,
+    build_case,
+    build_model_case,
+)
 
 pytestmark = pytest.mark.jax
 
@@ -56,15 +61,19 @@ def _weighted_signal(example, native) -> float:
 _HEAVY_CASES = ("DCEST_15N_3States", "COSCEST_1HN_IP_AP")
 
 
-@pytest.mark.parametrize(
-    "case",
-    [
-        pytest.param(c, marks=pytest.mark.memory_heavy)
-        if any(h in c for h in _HEAVY_CASES)
-        else c
-        for c in all_cases()
-    ],
-)
+def _residual_cases() -> list[object]:
+    params = []
+    for case in all_cases():
+        marks = []
+        if any(h in case for h in _HEAVY_CASES):
+            marks.append(pytest.mark.memory_heavy)
+        if case not in QUICK_CASES:
+            marks.append(pytest.mark.jax_full)
+        params.append(pytest.param(case, marks=marks) if marks else case)
+    return params
+
+
+@pytest.mark.parametrize("case", _residual_cases())
 def test_residuals_match_native_fitting(case: str) -> None:
     import jax
 

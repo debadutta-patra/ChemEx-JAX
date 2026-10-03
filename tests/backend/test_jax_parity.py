@@ -25,12 +25,18 @@ from tests.backend._checks import (
     JACREV_RTOL,
     check_profile,
 )
-from tests.backend._examples import all_cases, build_case, build_example
+from tests.backend._examples import (
+    QUICK_CASES,
+    all_cases,
+    build_case,
+    build_example,
+    quick_or_full,
+)
 from tests.backend._jax_profile import local_values, make_local_function
 
 pytestmark = pytest.mark.jax
 
-CASES = all_cases()
+CASES = quick_or_full(all_cases(), QUICK_CASES)
 
 
 @pytest.mark.parametrize("case", CASES)

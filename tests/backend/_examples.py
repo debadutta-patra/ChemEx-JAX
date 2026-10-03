@@ -188,3 +188,41 @@ def model_cases() -> list[str]:
 def build_model_case(model: str) -> BuiltExample:
     """The synthetic CPMG 15N template built with ``model``."""
     return build_example("MODELS", root=SYNTHETIC, model=model)
+
+
+# Quick (CI) coverage: one case per propagator route — CPMG (expm), CEST with
+# complete dephasing (eig custom_jvp), D-CEST (DANTE powers), relaxation, and
+# a shift experiment (eigenvalues).  Everything else is marked ``jax_full``.
+QUICK_CASES = frozenset(
+    {
+        "Experiments/CPMG_15N_IP",
+        "Experiments/CEST_15N",
+        "Experiments/DCEST_15N",
+        "Experiments/RELAXATION_NZ",
+        "synthetic/SHIFT_15N_SQ",
+    }
+)
+# One model per twin family and suffix.
+QUICK_MODELS = frozenset(
+    {
+        "2st",
+        "2st.mf",
+        "3st_linear.rs",
+        "4st_hd",
+        "2st_eyring.tc",
+        "4st_eyring",
+        "2st_binding",
+        "3st_binding_cs",
+        "2st_monomer_dimer",
+        "3st_monomer_dimer_trimer",
+    }
+)
+
+
+def quick_or_full(values: list[str], quick: frozenset[str]) -> list[object]:
+    """Parametrize values; those outside ``quick`` carry the ``jax_full`` mark."""
+    import pytest
+
+    return [
+        v if v in quick else pytest.param(v, marks=pytest.mark.jax_full) for v in values
+    ]
