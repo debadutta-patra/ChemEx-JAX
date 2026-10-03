@@ -1,9 +1,13 @@
+# Modified in the ChemEx-JAX fork (GPL-3.0-or-later): adds the optional
+# `compare-backends` subcommand.
+
 """The parsing module contains the code for the parsing of command-line arguments."""
 
 from argparse import SUPPRESS, ArgumentParser, ArgumentTypeError
 from pathlib import Path
 
 from chemex import __version__
+from chemex.backend import compare
 from chemex.parameters.spin_system import SpinSystem
 from chemex.runtime.execution import ExecutionCount
 from chemex.tools.pick_cest import pick_cest
@@ -294,5 +298,9 @@ def build_parser() -> ArgumentParser:
         required=True,
         help="Name of the parameter to plot",
     )
+
+    # ChemEx-JAX fork: optional NumPy-vs-JAX comparison (imports JAX lazily).
+    compare_parser = compare.add_parser(subparsers)
+    _add_debug_argument(compare_parser, inherit_default=True)
 
     return parser

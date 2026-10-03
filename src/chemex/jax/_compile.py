@@ -312,6 +312,7 @@ class CompiledResiduals:
     _program: _Program = field(repr=False)
     _groups: list[_ResidualGroup] = field(repr=False)
     _order: np.ndarray = field(repr=False)
+    _observations: np.ndarray = field(repr=False)
 
     @property
     def x0(self) -> np.ndarray:
@@ -327,14 +328,26 @@ class CompiledResiduals:
         """Number of distinct compiled kernels (shape/settings groups)."""
         return len(self._groups)
 
-    def __call__(self, x: Any) -> jax.Array:
+    def _calculations(self, x: Any) -> list[jax.Array]:
         x = _as_float64(x, len(self.free_ids))
         values = self._program.resolve(x)
-        flat = []
-        for group in self._groups:
-            calc = group.kernel.function(
+        return [
+            group.kernel.function(
                 _local_matrix(values, group.profiles, group.kernel.names)
             )
+            for group in self._groups
+        ]
+
+    def calculations(self, x: Any) -> jax.Array:
+        """Unscaled calculated intensities of every observation (masked ones
+        included), concatenated in ChemEx's experiment/profile/point order —
+        the native evaluator's ``unscaled_calculations``."""
+        flat = [calc.ravel() for calc in self._calculations(x)]
+        return jnp.concatenate(flat)[self._observations]
+
+    def __call__(self, x: Any) -> jax.Array:
+        flat = []
+        for group, calc in zip(self._groups, self._calculations(x), strict=True):
             mask = jnp.asarray(group.mask)
             err = jnp.asarray(group.err)
             exp = jnp.asarray(group.exp)
@@ -418,14 +431,20 @@ def compile_residuals(
         offsets.append(offset)
         offset += len(indices) * arrays[0][0].size
 
-    order = []
+    order: list[int] = []
+    observations: list[int] = []
     for i, profile in enumerate(profiles):
         g, row = position[i]
         n_points = groups[g].exp.shape[1]
         start = offsets[g] + row * n_points
         order.extend(start + np.flatnonzero(np.asarray(profile.data.mask)))
+        observations.extend(start + np.arange(n_points))
     return CompiledResiduals(
-        tuple(free_ids), program, groups, np.asarray(order, dtype=np.intp)
+        tuple(free_ids),
+        program,
+        groups,
+        np.asarray(order, dtype=np.intp),
+        np.asarray(observations, dtype=np.intp),
     )
 
 
