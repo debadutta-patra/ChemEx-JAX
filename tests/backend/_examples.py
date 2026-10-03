@@ -219,10 +219,22 @@ QUICK_MODELS = frozenset(
 )
 
 
+# Cases whose JAX compilation peaks above 4 GB (measured: COSCEST gradients
+# 8.3 GB, 3-state D-CEST gradients 6.4 GB); they run one at a time.
+MEMORY_HEAVY_CASES = ("DCEST_15N_3States", "COSCEST_1HN_IP_AP")
+
+
 def quick_or_full(values: list[str], quick: frozenset[str]) -> list[object]:
-    """Parametrize values; those outside ``quick`` carry the ``jax_full`` mark."""
+    """Parametrize values: those outside ``quick`` carry the ``jax_full`` mark,
+    those in ``MEMORY_HEAVY_CASES`` the ``memory_heavy`` mark."""
     import pytest
 
-    return [
-        v if v in quick else pytest.param(v, marks=pytest.mark.jax_full) for v in values
-    ]
+    params: list[object] = []
+    for value in values:
+        marks = []
+        if any(heavy in value for heavy in MEMORY_HEAVY_CASES):
+            marks.append(pytest.mark.memory_heavy)
+        if value not in quick:
+            marks.append(pytest.mark.jax_full)
+        params.append(pytest.param(value, marks=marks) if marks else value)
+    return params
