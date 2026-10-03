@@ -29,6 +29,10 @@ dependencies = [
   "scipy>=1.18,<1.19",
 ]
 
+[project.optional-dependencies]
+# ChemEx-JAX fork: optional JAX backend (chemex.jax, chemex compare-backends).
+jax = ["jax>=0.11"]
+
 [project.urls]
 Changelog = "https://github.com/gbouvignies/ChemEx/releases"
 Documentation = "https://gbouvignies.github.io/ChemEx/"
