@@ -38,7 +38,8 @@ jobs:
 
   publish-to-pypi:
     name: Publish to PyPI
-    if: github.event_name == 'release'  # only publish to PyPI on release
+    # Only the upstream repository publishes to PyPI; forks never do.
+    if: github.event_name == 'release' && github.repository == 'gbouvignies/ChemEx'
     needs:
     - build
     runs-on: ubuntu-latest
@@ -59,7 +60,7 @@ jobs:
 
   github-release:
     name: Sign and Upload Artifacts
-    if: github.event_name == 'release'
+    if: github.event_name == 'release' && github.repository == 'gbouvignies/ChemEx'
     needs:
     - publish-to-pypi
     runs-on: ubuntu-latest

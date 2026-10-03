@@ -363,6 +363,11 @@ Hard rules (in addition to everything above):
   public signature, adding a dependency, or accepting any numerical
   difference on the NumPy path.
 - Small commits on `jax-backend`; stop and report at the end of each phase.
+- Distribution: the fork lives only locally and on `origin`
+  (`debadutta-patra/ChemEx-JAX`). Never publish to PyPI and never push to or
+  open PRs against `upstream` (`gbouvignies/ChemEx`); the PyPI publish job is
+  guarded to the upstream repository and the local `upstream` remote is
+  fetch-only.
 - Memory: JAX compilation and forward-mode Jacobians are memory-hungry (a full
   Jacobian over every parameter of a CEST example exhausted 30 GB). Run heavy
   JAX jobs under a cgroup cap (`systemd-run --user --scope -p MemoryMax=...`),
