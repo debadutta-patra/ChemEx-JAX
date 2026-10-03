@@ -79,6 +79,44 @@ In a development checkout, you can instead run commands through
 `uv run --with "jax>=0.11" …`. ChemEx itself, including `import chemex` and
 the CLI, works without JAX.
 
+## Check it on your own data
+
+Before relying on the JAX backend for a data set, run the comparison command
+on it. It takes the same inputs as `chemex fit`:
+
+```shell
+chemex compare-backends -e Experiments/*.toml -p Parameters/parameters.toml \
+    [-d 2st] [--include ...] [--exclude ...] [--gradients 3] [--json report.json]
+```
+
+It builds your experiments exactly as `chemex fit` does, then evaluates them
+twice: once with ChemEx's native NumPy evaluator, once with the JAX backend.
+Each experiment is compiled separately, to keep memory low. For each
+experiment it reports how closely the two agree, and the timings:
+
+```text
+                          NumPy vs JAX backend
+Experiment  Prof.  Kern.  Calc.  Resid.  χ²     NumPy  JAX    Compile  OK
+──────────────────────────────────────────────────────────────────────────
+500mhz      54     1      6e-14  4e-14   6e-15  32 ms  23 ms  4.1 s    yes
+800mhz      54     1      1e-13  5e-14   1e-14  27 ms  12 ms  3.2 s    yes
+```
+
+* **Calc.**: largest relative difference of the calculated intensities over
+  all profiles.
+* **Resid.**: difference of the weighted residuals that `chemex fit`
+  minimises, relative to the weighted signal.
+* **χ²**: relative difference of χ².
+* **Kern.**: number of compiled kernels (profiles that share an experiment
+  layout share one).
+
+With `--gradients N`, it also compares JAX derivatives with finite differences
+of the NumPy residuals, for the N fitted parameters shared by the most
+profiles. Parameters with a negligible effect are marked "FD noise-limited":
+there, finite differences cannot certify anything. The command exits with
+status 1 if any parity check exceeds `--rtol` (default 1e-9), so it can also
+run in scripts.
+
 ## Quick start
 
 Build experiments with ChemEx's normal setup code (the same TOML files you
@@ -394,6 +432,8 @@ installed with ChemEx; choose one yourself.
 | `cj.compile_residuals(experiments, parameterization, free_ids, *, frame)` | Returns `r(x)`: ChemEx's native weighted residual vector. Attributes: `x0`, `free_ids`, `size`, `group_count`; methods `chi2(x)`, `validate(x)`. |
 | `cj.compile_profile(profile, parameterization, free_ids, *, frame)` | Returns `f(x)`: one profile's unscaled calculated intensities. Attributes: `x0`, `free_ids`; method `validate(x)`. |
 | `validate(x)` | Runs ChemEx's own checked parameter resolution on a concrete `x` and raises on domain errors (e.g. populations summing to more than 1). |
+| `cj.jacobian(f, x, chunk_size=None, mode="forward")` | Jacobian of `f` at `x`. Without `chunk_size` it is `jax.jacfwd`/`jacrev`; with it, columns (forward) or rows (reverse) are computed `chunk_size` at a time to bound memory. |
+| `residuals.calculations(x)` | Unscaled calculated intensities of every observation, in ChemEx's order. |
 | `cj.release_memory()` | Drops compiled kernels and returns freed memory to the operating system. |
 | `cj.kernel_signature(profile)`, `cj.KERNEL_CACHE` | Grouping key and cache of compiled kernels (advanced). |
 
@@ -421,7 +461,11 @@ parameter. Measured peaks:
 * a Jacobian over *every* parameter of a large CEST example: over 30 GB.
   **Avoid this.**
 
-Keep Jacobians to fitting-step size (tens of parameters). For a scalar such
+Keep Jacobians to fitting-step size (tens of parameters), or compute them in
+chunks with `cj.jacobian(r, x, chunk_size=16)`: at most 16 columns are held at
+once. For CPMG_15N_IP with all 326 parameters free, this cuts peak memory from
+5.9 GB to 1.7 GB for about 16% more time. For few outputs and many parameters,
+use `mode="reverse"`. For a scalar such
 as χ² or a log-density, prefer `jax.grad`/`jacrev`. In long-running processes
 call `cj.release_memory()` when idle. Otherwise the process keeps its peak
 memory after the compiled functions are dropped.

@@ -871,6 +871,30 @@ differentiability). Every code snippet was run (CPMG_15N_IP, two residues);
 the Docusaurus site builds (`npm ci && npm run build`); the page renders at
 `/docs/next/user_guide/jax_backend`.
 
+## 6.12 Phase 4 follow-ups (maintainer requests, 2026-10-03)
+
+**Memory option.** `chemex.jax.jacobian(f, x, chunk_size=None,
+mode="forward"|"reverse")`. Without `chunk_size` it is exactly
+`jacfwd`/`jacrev`; with it, columns (batched `jvp`) or rows (batched `vjp` on
+one linearisation) are computed `chunk_size` at a time, zero-padded so that
+one compile serves all chunks. Chunked results match the unchunked Jacobian
+to 4e-16 (forward) and 2e-15 (reverse). CPMG_15N_IP, 326 free parameters:
+5.85 GB, 20.4 s → 1.68 GB, 23.7 s with `chunk_size=16`. Chunking residue
+batches (option 2) was **not** built: for the largest example (468 D-CEST
+profiles) XLA compilation accounts for 5.4 GB of the 7.4 GB peak and
+execution for only 1.5 GB.
+
+**`chemex compare-backends`** (`src/chemex/backend/compare.py`; one-line
+hook in `cli.py`; JAX imported only when the command runs). It builds the
+user's data like `chemex fit` and reports, per experiment: calculation
+agreement, residual/χ² agreement with the native evaluator, NumPy vs JAX
+timings, compiled-kernel count, and optionally (`--gradients N`) JAX vs FD
+derivatives with FD noise-limited parameters flagged. It exits 1 on a parity
+failure; `--json` writes the report. `CompiledResiduals.calculations(x)` was
+added for the calculation comparison. Two bugs were found by its tests and
+fixed: rich swallowed `[jax]` in the install hint (now `markup=False`), and a
+zero derivative column was given a fallback scale of 1 (now effect 0).
+
 ## 7. Decisions (maintainer, 2026-10-02)
 
 1. Golden comparisons exclude every `*identity` value (see §2).
