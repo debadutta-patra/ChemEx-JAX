@@ -6,6 +6,7 @@ Importing this package enables ``jax_enable_x64``; all inputs must be float64.
 * :func:`compile_profile` — ``f(x) -> unscaled profile`` for one profile.
 * :func:`compile_residuals` — ``r(x)`` = ChemEx's native weighted residuals
   (scaling, masks, error weighting, ordering), with ``chi2``.
+* :func:`jacobian` — ``jacfwd``/``jacrev`` with optional memory-bounded chunks.
 
 ``x`` holds the values of ``free_ids`` (independent parameter ids of the
 active parameterization); every other independent parameter is fixed at
@@ -29,6 +30,7 @@ from chemex.jax._compile import (  # noqa: E402
     CompiledResiduals,
     compile_profile,
     compile_residuals,
+    jacobian,
     kernel_signature,
     release_memory,
 )
@@ -39,6 +41,7 @@ __all__ = [
     "CompiledResiduals",
     "compile_profile",
     "compile_residuals",
+    "jacobian",
     "kernel_signature",
     "release_memory",
 ]

@@ -275,3 +275,37 @@ def test_concurrent_use_from_threads_matches_serial() -> None:
     assert not errors, errors
     for (_, case), value in results.items():
         np.testing.assert_array_equal(value, serial[case])
+
+
+@pytest.mark.parametrize(
+    ("mode", "chunk"), [("forward", 3), ("forward", 7), ("reverse", 64)]
+)
+def test_chunked_jacobian_matches_unchunked(mode: str, chunk: int) -> None:
+    import jax
+
+    import chemex.jax as cj
+
+    example = build_case("Experiments/CPMG_13C_IP")
+    residuals = cj.compile_residuals(
+        example.experiments,
+        example.parameterization,
+        example.parameterization.independent_ids[:10],
+        frame=example.frame,
+    )
+    x0 = residuals.x0
+    unchunked = (jax.jacfwd if mode == "forward" else jax.jacrev)(residuals)
+    full = np.asarray(unchunked(x0))
+    chunked = np.asarray(cj.jacobian(residuals, x0, chunk_size=chunk, mode=mode))
+    assert chunked.shape == full.shape
+    # Chunking changes nothing but grouping; forward vs reverse mode differ at
+    # the suite's jacfwd/jacrev tolerance.
+    assert np.max(np.abs(chunked - full)) <= 1e-13 * np.max(np.abs(full))
+    forward = np.asarray(jax.jacfwd(residuals)(x0))
+    assert np.max(np.abs(chunked - forward)) <= 1e-10 * np.max(np.abs(forward))
+    np.testing.assert_array_equal(
+        np.asarray(cj.jacobian(residuals, x0, mode=mode)), full
+    )
+    with pytest.raises(ValueError, match="mode"):
+        cj.jacobian(residuals, x0, mode="sideways")
+    with pytest.raises(ValueError, match="chunk_size"):
+        cj.jacobian(residuals, x0, chunk_size=0)

@@ -453,3 +453,63 @@ def release_memory() -> None:
     except (OSError, AttributeError):  # not glibc
         return
     trim(0)
+
+
+def _in_chunks(
+    apply: Callable[[jax.Array], jax.Array], size: int, chunk_size: int, dtype: Any
+) -> jax.Array:
+    """Stack ``apply(basis_block)`` over identity blocks of ``chunk_size`` rows.
+
+    The last block is zero-padded to the same shape so ``apply`` compiles once.
+    """
+    blocks = []
+    for start in range(0, size, chunk_size):
+        block = jnp.eye(size, dtype=dtype)[start : start + chunk_size]
+        used = block.shape[0]
+        if used < chunk_size:
+            padding = jnp.zeros((chunk_size - used, size), dtype)
+            block = jnp.concatenate([block, padding])
+        blocks.append(apply(block)[:used])
+    return jnp.concatenate(blocks, axis=0)
+
+
+def jacobian(
+    function: Callable[[jax.Array], jax.Array],
+    x: Any,
+    *,
+    chunk_size: int | None = None,
+    mode: str = "forward",
+) -> jax.Array:
+    """Jacobian of ``function`` at ``x``, optionally in memory-bounded chunks.
+
+    ``mode="forward"`` builds columns (one per parameter) and suits few
+    parameters / many residuals; ``mode="reverse"`` builds rows and suits many
+    parameters / few outputs.  Without ``chunk_size`` this is exactly
+    ``jax.jacfwd`` / ``jax.jacrev``.  With ``chunk_size = k``, at most ``k``
+    columns (forward) or rows (reverse) are computed at once, which bounds the
+    tangent/cotangent memory to ``k`` copies of the calculation instead of one
+    per parameter (forward) or output (reverse); the chunk function is compiled
+    once (the last chunk is zero-padded).  Forward chunks recompute the
+    primal once per chunk; reverse chunks share one linearisation.
+    """
+    x = jnp.asarray(x)
+    if mode not in ("forward", "reverse"):
+        msg = f"mode must be 'forward' or 'reverse', got {mode!r}"
+        raise ValueError(msg)
+    if chunk_size is not None and chunk_size < 1:
+        raise ValueError("chunk_size must be a positive integer")
+    if mode == "forward":
+        if chunk_size is None or chunk_size >= x.shape[0]:
+            return jax.jacfwd(function)(x)
+
+        @jax.jit
+        def columns(tangents: jax.Array) -> jax.Array:
+            return jax.vmap(lambda t: jax.jvp(function, (x,), (t,))[1])(tangents)
+
+        return _in_chunks(columns, x.shape[0], chunk_size, x.dtype).T
+
+    output, pullback = jax.vjp(function, x)
+    if chunk_size is None or chunk_size >= output.shape[0]:
+        return jax.jacrev(function)(x)
+    rows = jax.jit(jax.vmap(lambda c: pullback(c)[0]))
+    return _in_chunks(rows, output.shape[0], chunk_size, output.dtype)
