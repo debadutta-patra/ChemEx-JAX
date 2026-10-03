@@ -14,7 +14,9 @@ from collections.abc import Callable, Iterable, Sequence
 from types import ModuleType
 from typing import Any, Protocol, runtime_checkable
 
-from chemex.typing import Array
+# Arrays on the evaluation path are NumPy or JAX arrays depending on the
+# backend, so the protocol does not commit to either.
+type BackendArray = Any
 
 
 @runtime_checkable
@@ -33,27 +35,27 @@ class Backend(Protocol):
 
     def propagators(
         self,
-        liouv: Array,
+        liouv: BackendArray,
         delays: float | Iterable[float],
         *,
         dephasing: bool = False,
-    ) -> Array:
+    ) -> BackendArray:
         """Mirror ``chemex.nmr._pulses.propagators.calculate_propagators``."""
         ...
 
-    def matrix_power(self, a: Array, n: int) -> Array:
+    def matrix_power(self, a: BackendArray, n: int) -> BackendArray:
         """Integer matrix power over the last two axes (``n`` is a constant)."""
         ...
 
-    def stack(self, seq: Sequence[Any]) -> Array:
+    def stack(self, seq: Sequence[Any]) -> BackendArray:
         """Stack scalars or arrays along a new leading axis."""
         ...
 
     def detect(
         self,
-        detection_vector: Array,
-        magnetization: Array,
-        weights: Array,
+        detection_vector: BackendArray,
+        magnetization: BackendArray,
+        weights: BackendArray,
     ) -> Any:
         """Detect the signal; a Python float on NumPy, a 0-d array on JAX."""
         ...

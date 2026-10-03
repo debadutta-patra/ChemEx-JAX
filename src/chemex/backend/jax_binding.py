@@ -268,21 +268,23 @@ def solve_binding_equilibrium(
         jnp.where(p == -jnp.inf, -jnp.inf, p - log_population_total)
         for p in raw_log_populations
     )
-    return BindingEquilibrium(
-        protein_free=protein_free,
-        ligand_free=ligand_free,
-        bound_total=bound_total,
-        free_proteins=distribute(protein_free, protein_fractions),
-        free_ligands=distribute(ligand_free, free_fractions),
-        complexes=distribute(bound_total, complex_fractions),
-        populations=populations,
-        log_populations=log_populations,
-        free_protein_log_fractions=protein_log_fractions,
-        free_ligand_log_fractions=free_log_fractions,
-        complex_log_fractions=complex_log_fractions,
-        edge_log_ratios=tuple(edge_log_ratios),
-        log_apparent_kd=log_apparent_kd,
-    )
+    # Same record ChemEx returns, holding (possibly traced) JAX arrays.
+    fields: dict[str, Any] = {
+        "protein_free": protein_free,
+        "ligand_free": ligand_free,
+        "bound_total": bound_total,
+        "free_proteins": distribute(protein_free, protein_fractions),
+        "free_ligands": distribute(ligand_free, free_fractions),
+        "complexes": distribute(bound_total, complex_fractions),
+        "populations": populations,
+        "log_populations": log_populations,
+        "free_protein_log_fractions": protein_log_fractions,
+        "free_ligand_log_fractions": free_log_fractions,
+        "complex_log_fractions": complex_log_fractions,
+        "edge_log_ratios": tuple(edge_log_ratios),
+        "log_apparent_kd": log_apparent_kd,
+    }
+    return BindingEquilibrium(**fields)
 
 
 def detailed_balance_rate(

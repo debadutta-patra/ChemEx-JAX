@@ -80,7 +80,8 @@ def log_monomer_fraction(
         return y - delta, delta, iteration + 1
 
     zero = jnp.zeros((), dtype=jnp.float64)
-    y, _, _ = lax.while_loop(cond, body, (zero, jnp.asarray(jnp.inf), 0))
+    state = (zero, jnp.asarray(jnp.inf), jnp.asarray(0))
+    y, _, _ = lax.while_loop(cond, body, state)
     return y
 
 
@@ -124,15 +125,17 @@ def solve_oligomerization_fractions(
         jnp.arange(tagged.shape[0]) == jnp.argmax(tagged)
     )
     count = len(stoichiometries)
-    return OligomerizationEquilibrium(
-        monomer_fraction=tagged[0],
-        oligomer_fractions=tuple(tagged[k + 1] / n[k] for k in range(count)),
-        log_monomer_fraction=log_tagged[0],
-        log_oligomer_fractions=tuple(
+    # Same record ChemEx returns, holding (possibly traced) JAX arrays.
+    fields: dict[str, Any] = {
+        "monomer_fraction": tagged[0],
+        "oligomer_fractions": tuple(tagged[k + 1] / n[k] for k in range(count)),
+        "log_monomer_fraction": log_tagged[0],
+        "log_oligomer_fractions": tuple(
             log_tagged[k + 1] - jnp.log(n[k]) for k in range(count)
         ),
-        log_tagged_fractions=tuple(log_tagged[k] for k in range(count + 1)),
-    )
+        "log_tagged_fractions": tuple(log_tagged[k] for k in range(count + 1)),
+    }
+    return OligomerizationEquilibrium(**fields)
 
 
 def concentrations_from_log_fractions(

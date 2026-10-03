@@ -22,7 +22,7 @@ from collections import OrderedDict
 from collections.abc import Callable, Iterable, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
 import jax
 import jax.numpy as jnp
@@ -168,7 +168,9 @@ def _build_group_kernel(profile: Profile) -> _GroupKernel:
     def single(local: jax.Array) -> jax.Array:
         # A private copy per trace: tracers live and die with this object.
         spectrometer = template.with_backend(_JAX)
-        spectrometer.update({n: local[i] for i, n in enumerate(names)})
+        # Traced local values in place of floats (the engine is backend-generic).
+        values = cast("dict[str, float]", {n: local[i] for i, n in enumerate(names)})
+        spectrometer.update(values)
         data = Data(
             exp=np.zeros(exp_shape),
             err=np.zeros(err_shape),
