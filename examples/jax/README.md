@@ -1,7 +1,7 @@
 # JAX examples (ChemEx-JAX fork)
 
 These examples need the optional JAX backend (`pip install 'chemex[jax]'`,
-or `uv run --with "jax>=0.11"` from a development checkout).
+or `uv run --extra jax` from a development checkout).
 
 ## `fisher_cpmg_15n_ip.py`: Fisher information with exact Jacobians
 
@@ -14,10 +14,10 @@ standard errors `sqrt(diag(F⁻¹))`.
 
 ```sh
 # at the initial parameter values
-uv run --with "jax>=0.11" python examples/jax/fisher_cpmg_15n_ip.py
+uv run --extra jax python examples/jax/fisher_cpmg_15n_ip.py
 
 # at ChemEx's fitted values (run the example's run.sh first)
-uv run --with "jax>=0.11" python examples/jax/fisher_cpmg_15n_ip.py \
+uv run --extra jax python examples/jax/fisher_cpmg_15n_ip.py \
     --parameters examples/Experiments/CPMG_15N_IP/Parameters/parameters.toml \
                  examples/Experiments/CPMG_15N_IP/Output/STEP1/Parameters/fitted.toml
 ```
@@ -43,7 +43,7 @@ It then checks the result against draws from the prior (one `vmap`) and
 compares CPMG periods (one compile each).
 
 ```sh
-uv run --with "jax>=0.11" python examples/jax/design_cpmg_15n_ip.py \
+uv run --extra jax python examples/jax/design_cpmg_15n_ip.py \
     [--residue 15N] [--points 26] [--noise 0.008] [--nu-max 1000]
 ```
 
@@ -62,8 +62,8 @@ noiseless prediction at the existing relative noise. The output is a table of
 predicted SE(KEX_AB) and SE(PB) per candidate.
 
 ```sh
-uv run --with "jax>=0.11" python examples/jax/next_experiment.py cpmg-b0 [--values 600 800 1200]
-uv run --with "jax>=0.11" python examples/jax/next_experiment.py cest-b1 [--values 5 10 20 40]
+uv run --extra jax python examples/jax/next_experiment.py cpmg-b0 [--values 600 800 1200]
+uv run --extra jax python examples/jax/next_experiment.py cest-b1 [--values 5 10 20 40]
 ```
 
 Pass `--parameters` with your fitted values, and `--snr-exponent` if you

@@ -13,7 +13,7 @@ five residues depend on, at most 24).  Forward-mode memory grows with the
 number of tangents times the traced intermediates: a full Jacobian over every
 independent parameter of a CEST example exhausted 30 GB.  Peak RSS is printed.
 
-    uv run --with "jax>=0.11" python benchmarks/jax_vs_numpy.py [EXAMPLE ...]
+    uv run --extra jax python benchmarks/jax_vs_numpy.py [EXAMPLE ...]
 
 Record the hardware/software context with any saved output.
 """

@@ -14,9 +14,9 @@ number, and the linearised standard errors sqrt(diag(F⁻¹)).
 
 Run from the repository root (needs the ``jax`` extra):
 
-    uv run --with "jax>=0.11" python examples/jax/fisher_cpmg_15n_ip.py
+    uv run --extra jax python examples/jax/fisher_cpmg_15n_ip.py
     # at ChemEx's fitted values, after running the example's run.sh:
-    uv run --with "jax>=0.11" python examples/jax/fisher_cpmg_15n_ip.py \\
+    uv run --extra jax python examples/jax/fisher_cpmg_15n_ip.py \\
         --parameters examples/Experiments/CPMG_15N_IP/Parameters/parameters.toml \\
                      examples/Experiments/CPMG_15N_IP/Output/STEP1/Parameters/fitted.toml
 

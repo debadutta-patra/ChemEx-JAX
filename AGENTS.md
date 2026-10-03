@@ -368,14 +368,21 @@ Hard rules (in addition to everything above):
   JAX jobs under a cgroup cap (`systemd-run --user --scope -p MemoryMax=...`),
   at most ~4 pytest workers, never two heavy jobs at once.
 
-Test commands:
+Environments and test commands:
 
 ```sh
-uv run pytest -q -n 8                                     # full upstream suite
-uv run python tests/backend/golden_outputs.py compare     # NumPy byte-identity
+uv sync --locked                 # NumPy only (JAX tests skip themselves)
+uv sync --locked --extra jax     # with the optional JAX backend
+
+uv run pytest -q -n 8                                     # full suite (JAX tests skip without the extra)
+uv run python tests/backend/golden_outputs.py compare     # NumPy byte-identity (38 runs, 500 files)
+uv run --extra jax pytest -q -n 2 -m "jax and not jax_full" tests/backend   # quick JAX set (CI)
 systemd-run --user --scope -p MemoryMax=20G -p MemorySwapMax=0 \
-  uv run --with "jax>=0.11" pytest -q -n 4 -m jax tests/backend  # JAX suite (~1-2 h)
+  uv run --extra jax pytest -q -n 4 -m jax_full tests/backend               # exhaustive sweep (~1-2 h)
+uv run --extra jax ty check                               # ty needs the extra to resolve jax
+uv run --extra jax chemex compare-backends -e ... -p ...  # NumPy vs JAX on any data set
 ```
 
-Phase status: Phases 0-4 complete (baseline, NMR engine, experiment catalog,
-constraint program and twins, public `chemex.jax` API) — see `JAX_PORT_NOTES.md`.
+Phase status: Phases 0-5 complete (baseline, NMR engine, experiment catalog,
+constraint program and twins, public `chemex.jax` API, packaging and docs) —
+see `JAX_PORT_NOTES.md`.

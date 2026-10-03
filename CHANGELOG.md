@@ -7,6 +7,26 @@ and this project uses [Calendar Versioning](https://calver.org/) (YYYY.MM.MICRO)
 
 ## [Unreleased]
 
+### Added (ChemEx-JAX fork)
+- Optional JAX backend (`pip install "chemex[jax]"` from this fork; JAX ≥ 0.11,
+  float64 only). The NMR engine, all 37 registered experiment types, every
+  kinetic model and the parameter constraint program run on either NumPy (the
+  default; outputs byte-identical to upstream) or JAX (`jit`, `vmap`, `grad`).
+- `chemex.jax`: `compile_profile`, `compile_residuals` (ChemEx's native
+  weighted residuals, scaling and χ²), `jacobian` (optionally chunked to bound
+  memory) and `release_memory`.
+- `chemex compare-backends`: compares the NumPy and JAX backends on your own
+  data (calculations, residuals, χ², timings, optional derivatives).
+- User guide page "Using the JAX backend" and worked examples in
+  `examples/jax/` (Fisher information, CPMG design, choosing the next B0/B1).
+
+### Changed (ChemEx-JAX fork)
+- Experiment modules and NMR kernels use backend-neutral operations (backend
+  stacking and matrix powers, index arrays instead of list indexing,
+  out-of-place accumulation); NumPy results are unchanged.
+- `ActiveParameterization.ordered_constraints` exposes the compiled constraint
+  order read-only.
+
 ### Changed
 - **Breaking model selection:** Removed the legacy `2st_rs` kinetic-model name.
   Use the composable `2st.rs` spelling instead.

@@ -895,6 +895,81 @@ added for the calculation comparison. Two bugs were found by its tests and
 fixed: rich swallowed `[jax]` in the install hint (now `markup=False`), and a
 zero derivative column was given a fallback scale of 1 (now effect 0).
 
+## 6.13 Phase 5 — packaging and documentation (done)
+
+* `pyproject.toml`: `[project.optional-dependencies] jax = ["jax>=0.11"]`;
+  `uv.lock` adds only jax 0.11.2, jaxlib 0.11.2, ml-dtypes 0.6.0, opt-einsum
+  3.4.0 (cp313/cp314 wheels). `mpmath` is in the `dev` group (Phase 2
+  decision).
+* CI (`.github/workflows/python-test.yml`): `test` is a matrix over Python
+  3.13/3.14 × backend numpy/jax (`uv sync --locked [--extra jax]`, marker
+  `not scientific_acceptance and not jax_full`; JAX tests skip themselves
+  without the extra); `typecheck` syncs with `--extra jax` so `ty` resolves
+  the JAX modules (no rule weakened); new `jax-full` job (nightly/manual,
+  one worker, 6 h limit) runs the exhaustive sweep; `package` smoke-tests the
+  wheel without JAX (no `jax` import) and with `[jax]` (`import chemex.jax`,
+  float64 on, `chemex compare-backends --help`). Verified locally: `uv build`,
+  `twine check`, both installs.
+* Test tiers: `jax_full` marks the exhaustive parametrisations (all 46
+  cases × forward/gradients/transformations/residuals; all 136 model
+  cases × 3); the quick set keeps one case per propagator route
+  (CPMG_15N_IP, CEST_15N, DCEST_15N, RELAXATION_NZ, synthetic SHIFT_15N_SQ)
+  and one model per twin family/suffix — 225 tests vs 542 in `jax_full`.
+* With the extra installed, `ty` found 13 annotation mismatches in the JAX
+  modules (protocol return types, equilibrium dataclasses filled with traced
+  arrays, a `while_loop` state, one `Spectrometer.update` call) — fixed with a
+  backend-neutral `BackendArray` alias, typed field dicts and a `cast`.
+* README: prominent modified-fork notice, "Optional JAX backend"
+  installation (from the fork's Git repository — the extra is not on PyPI),
+  licence notes (GPL-3.0-or-later, upstream copyright retained, fork notices,
+  JAX/jaxlib Apache-2.0). CHANGELOG `[Unreleased]`: "Added/Changed (ChemEx-JAX
+  fork)". User guide install section updated. Every upstream file the fork
+  modifies carries a "Modified in the ChemEx-JAX fork" comment (audited
+  against `d0ba6e34`; `uv.lock` is generated and cannot).
+
+### Minimal changes that could be proposed upstream (separate small PRs)
+
+Each is NumPy-bit-identical (golden outputs unchanged) and useful without
+JAX:
+
+1. **Index arrays instead of Python-list fancy indexing** —
+   `nmr/_pulses/library.py` (4 sites) and 7 catalog modules
+   (`cpmg_15n_ip_0013`, `cpmg_15n_tr`, `cpmg_15n_tr_0013`,
+   `cpmg_1hn_ap_0013`, `cpmg_ch3_13c_h2c(_0013)`, `cpmg_ch3_1h_tq_diff`,
+   `cpmg_hn_dq_zq`).
+2. **Namespace-neutral operators in the catalog** —
+   `reduce(operator.matmul, …)` for `reduce(np.matmul, …)`,
+   `x.mean(axis=0)` for `np.mean(x, axis=0)`, method-form `squeeze`.
+3. **Out-of-place magnetization accumulation** —
+   `nmr/_engine/magnetization.py` (`m = m + x`).
+4. **Backend hook** — `chemex/backend/` (protocol + NumPy backend only),
+   `ISLiouvillianEngine.backend`, `Spectrometer.backend/xp/with_backend`,
+   routing of propagators/phase stacking/detection in `_pulses/kernel.py` and
+   `_engine/readout.py`, and `spectrometer.backend.stack/matrix_power` in the
+   catalog. Lets alternative numerics (JAX, or anything else) plug in without
+   patching; the JAX backend could then live in a separate package.
+5. **Public accessors for the constraint program** —
+   `ActiveParameterization.ordered_constraints` (read-only), optionally the
+   backend-generic `parameters/program_evaluation.py` (bit-identical to
+   `resolve()` on NumPy). A profile's `name_map` is already a public
+   dataclass field; no change needed.
+6. **`xp` parameters for eigenvalue analysis and effective-field tilts** —
+   `nmr/_engine/analysis.py`, `nmr/_engine/effective_field.py`, `shift_*`
+   `_find_nearest` (NumPy paths unchanged).
+
+Separately, to JAX: `jax.scipy.linalg.expm` uses `floor` where Higham (2005)
+and its own docstring use `ceil` for the number of squarings (§6.8).
+
+### Future work (not in scope)
+
+* GPU path for complete-dephasing propagators (Schur-based) — dephasing
+  uses `jnp.linalg.eig`, tested on CPU only.
+* Compile time/memory: restructure long offset/shaped-pulse loops as
+  `lax` loops (COSCEST ≈ 2 min per compile; the 468-profile D-CEST example
+  spends 5.4 GB in XLA compilation).
+* A `custom_jvp` for the corrected `expm` via the block-triangular Fréchet
+  identity (part-1 Jacobian ≈ 2× the prototype's).
+
 ## 7. Decisions (maintainer, 2026-10-02)
 
 1. Golden comparisons exclude every `*identity` value (see §2).

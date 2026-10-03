@@ -69,15 +69,16 @@ Measured on one CPU (Intel i7-13700H, JAX 0.11.2):
 
 ## Installation
 
-The backend needs JAX ≥ 0.11 (CPU builds are enough):
+The JAX backend is an optional extra of the ChemEx-JAX fork. It is not part of
+the `chemex` package on PyPI. Install the fork with the extra:
 
 ```shell
-pip install "jax>=0.11"
+python -m pip install "chemex[jax] @ git+https://github.com/debadutta-patra/ChemEx-JAX@jax-backend"
 ```
 
-In a development checkout, you can instead run commands through
-`uv run --with "jax>=0.11" …`. ChemEx itself, including `import chemex` and
-the CLI, works without JAX.
+In a development checkout, use `uv sync --extra jax`. CPU builds of JAX
+(≥ 0.11) are enough. ChemEx itself (`import chemex`, the CLI) works without
+JAX.
 
 ## Check it on your own data
 
@@ -325,10 +326,10 @@ ranking. It has two modes:
 
 ```shell
 # CPMG: which B0 to add to a 15N CPMG data set recorded at 500 MHz?
-uv run --with "jax>=0.11" python examples/jax/next_experiment.py cpmg-b0 \
+uv run --extra jax python examples/jax/next_experiment.py cpmg-b0 \
     --parameters my/parameters.toml my/Output/STEP1/Parameters/fitted.toml
 # CEST: which B1 to add to a 15N CEST data set recorded with B1 = 26 Hz?
-uv run --with "jax>=0.11" python examples/jax/next_experiment.py cest-b1 \
+uv run --extra jax python examples/jax/next_experiment.py cest-b1 \
     --values 5 10 13 20 40
 ```
 

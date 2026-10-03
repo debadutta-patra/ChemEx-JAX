@@ -1,5 +1,18 @@
 # ChemEx: NMR Chemical Exchange Analysis Tool
 
+> [!IMPORTANT]
+> **This is ChemEx-JAX, a modified fork of
+> [ChemEx](https://github.com/gbouvignies/ChemEx) by Guillaume Bouvignies.**
+> It adds an optional [JAX](https://docs.jax.dev) backend that runs ChemEx's
+> experiments, kinetic models and parameter constraints as differentiable,
+> compilable functions, for exact Jacobians, Fisher information, experiment
+> design, gradient-based sampling and fast batch simulation. Everything else
+> is upstream ChemEx: `chemex fit`, the TOML formats, models and optimizers
+> are unchanged, and the default NumPy results are byte-identical to upstream.
+> See [Optional JAX backend](#optional-jax-backend-chemex-jax-fork) and the
+> user guide page `website/docs/user_guide/jax_backend.md`. Please report
+> issues with the JAX backend to this fork, not to upstream ChemEx.
+
 [![Lint: Ruff](https://img.shields.io/badge/lint-Ruff-D7FF64.svg?logo=ruff)](https://docs.astral.sh/ruff/)
 
 ## Table of Contents
@@ -15,6 +28,7 @@
         - [Reproducible, version-pinned installation](#reproducible-version-pinned-installation)
         - [Alternative: pip](#alternative-pip)
         - [Conda packages](#conda-packages)
+        - [Optional JAX backend (ChemEx-JAX fork)](#optional-jax-backend-chemex-jax-fork)
     - [Contributing](#contributing)
     - [Support and Documentation](#support-and-documentation)
     - [License](#license)
@@ -96,6 +110,28 @@ python -m pip install chemex
 The historical conda-forge package is no longer maintained by the ChemEx
 project and may be outdated. Install the current PyPI release with uv or pip.
 
+### Optional JAX backend (ChemEx-JAX fork)
+
+The JAX backend is an optional extra of this fork (it is not in the `chemex`
+package on PyPI). Install the fork with the extra from its Git repository:
+
+```shell
+python -m pip install "chemex[jax] @ git+https://github.com/debadutta-patra/ChemEx-JAX@jax-backend"
+# or, in a development checkout:
+uv sync --extra jax
+```
+
+ChemEx itself (`import chemex`, the `chemex` command) works without JAX. To
+check the backend on your own data, run
+
+```shell
+chemex compare-backends -e Experiments/*.toml -p Parameters/parameters.toml
+```
+
+and see the user guide page "Using the JAX backend" for the Python API
+(`chemex.jax`), worked examples (`examples/jax/`), and its costs (compile
+time, memory, float64 only).
+
 ## Contributing
 
 We encourage contributions from the community. Please see our [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to make ChemEx better. For any issues or suggestions, please open an issue or a discussion on our [GitHub repository](https://github.com/gbouvignies/ChemEx).
@@ -107,6 +143,14 @@ For additional support, tutorials, and detailed documentation, visit the [ChemEx
 ## License
 
 ChemEx is licensed under the [GPL-3.0](https://www.gnu.org/licenses/gpl-3.0.en.html). See the [LICENSE](LICENSE.md) file for more details.
+
+ChemEx-JAX is a modified version of ChemEx and is distributed under the same
+licence, GPL-3.0-or-later. Upstream copyright notices are retained. Files
+changed in the fork carry a "Modified in the ChemEx-JAX fork" comment, and
+files added by the fork are marked "ChemEx-JAX fork addition". The fork's
+changes are described in `JAX_PORT_NOTES.md` and `CHANGELOG.md`. JAX and
+jaxlib are optional dependencies under the Apache License 2.0, which is
+compatible with GPL-3.0.
 
 <!-- ## Citing ChemEx
 

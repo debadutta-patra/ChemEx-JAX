@@ -24,7 +24,7 @@ Noise model: constant σ equal to ``--noise`` × the reference intensity (the
 example's data have ≈ 0.8%).  Results are predictions for the assumed
 parameters, not guarantees.
 
-    uv run --with "jax>=0.11" python examples/jax/design_cpmg_15n_ip.py
+    uv run --extra jax python examples/jax/design_cpmg_15n_ip.py
 """
 
 from __future__ import annotations

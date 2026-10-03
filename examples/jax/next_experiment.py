@@ -22,9 +22,9 @@ parameters of interest is the most informative next experiment.
 Modes (run from the repository root):
 
     # next B0 field for a 15N CPMG data set recorded at 500 MHz
-    uv run --with "jax>=0.11" python examples/jax/next_experiment.py cpmg-b0
+    uv run --extra jax python examples/jax/next_experiment.py cpmg-b0
     # next B1 field for a 15N CEST data set recorded with B1 = 26 Hz
-    uv run --with "jax>=0.11" python examples/jax/next_experiment.py cest-b1
+    uv run --extra jax python examples/jax/next_experiment.py cest-b1
 
 Pass ``--parameters`` with your fitted values for a real decision; the
 defaults use the examples' parameter files.  ``--snr-exponent k`` scales the
