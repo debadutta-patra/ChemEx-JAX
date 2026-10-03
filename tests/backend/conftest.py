@@ -25,7 +25,8 @@ def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
         "markers",
         "memory_heavy: needs several GB; such tests run one at a time across "
-        "xdist workers (inter-process lock)",
+        "xdist workers (inter-process lock); the exhaustive sweep runs them in "
+        "a separate single-process run (workers keep their high-water mark)",
     )
 
 

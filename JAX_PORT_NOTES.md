@@ -846,6 +846,21 @@ spectrometers; 2 threads × 3 examples concurrently = serial results.
   workers under any `-n` (verified: strictly serial start/end). A
   root-conftest `--dist loadgroup` switch did not work: xdist reads the
   option before conftest hooks run.
+* The lock is not enough for the exhaustive sweep: a worker keeps roughly
+  its high-water mark after a heavy test. After compiling a 3-state D-CEST
+  profile, glibc reported 0.47 GB in use in a 1.58 GB main heap; the rest
+  is fragmentation left by XLA/LLVM, and `malloc_trim` only returns whole
+  free pages (1.96 → 1.22 GB in a script; 3.51 → 3.48 GB under pytest).
+  `MALLOC_ARENA_MAX=2` saved ~0.15 GB. So `jax_full -n 4` (20 GB cap) and
+  `-n 3` (18 GB cap) were both OOM-killed at ~92 %, when the workers that
+  had run COSCEST/D-CEST cases (7.3-8.9 GB each) were also hosting others.
+  The sweep therefore runs in two stages: `jax_full and not memory_heavy`
+  with `-n 3` (522 passed, 25.6 min, peak 9.06 GB total, 3.43 GB per
+  worker), then `jax_full and memory_heavy` in one process (20 passed,
+  82 min, peak 8.77 GB). `quick_or_full` marks every case in
+  `MEMORY_HEAVY_CASES` (`tests/backend/_examples.py`) as `memory_heavy`.
+  The nightly CI job runs everything with `-n 1`, so its peak is the
+  single-process 8.8 GB.
 
 **Experiment-design examples** (requested during Phase 4):
 

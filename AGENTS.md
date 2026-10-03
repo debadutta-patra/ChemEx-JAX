@@ -382,8 +382,11 @@ uv sync --locked --extra jax     # with the optional JAX backend
 uv run pytest -q -n 8                                     # full suite (JAX tests skip without the extra)
 uv run python tests/backend/golden_outputs.py compare     # NumPy byte-identity (38 runs, 500 files)
 uv run --extra jax pytest -q -n 2 -m "jax and not jax_full" tests/backend   # quick JAX set (CI)
-systemd-run --user --scope -p MemoryMax=20G -p MemorySwapMax=0 \
-  uv run --extra jax pytest -q -n 4 -m jax_full tests/backend               # exhaustive sweep (~1-2 h)
+# Exhaustive sweep in two stages (~1 h 50 min, peaks 9.1 GB then 8.8 GB):
+systemd-run --user --scope -p MemoryMax=18G -p MemorySwapMax=0 \
+  uv run --extra jax pytest -q -n 3 -m "jax_full and not memory_heavy" tests/backend
+systemd-run --user --scope -p MemoryMax=14G -p MemorySwapMax=0 \
+  uv run --extra jax pytest -q -n 0 -m "jax_full and memory_heavy" tests/backend
 uv run --extra jax ty check                               # ty needs the extra to resolve jax
 uv run --extra jax chemex compare-backends -e ... -p ...  # NumPy vs JAX on any data set
 ```
